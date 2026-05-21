@@ -1,0 +1,45 @@
+{
+  "name": "theazo-sandbox",
+  "version": "0.1.0",
+  "description": "Theazo Sandbox SDK — Lightweight observability bridge for agent sandboxes",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist",
+    "lint": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "typescript": "^5.5.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/theazo/theazo-node.git",
+    "directory": "packages/theazo-sandbox"
+  },
+  "homepage": "https://theazo.com",
+  "bugs": "https://github.com/theazo/theazo-node/issues",
+  "keywords": [
+    "ai",
+    "agents",
+    "sandbox",
+    "observability",
+    "theazo"
+  ],
+  "license": "MIT",
+  "author": "Theazo"
+}

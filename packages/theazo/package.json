@@ -1,0 +1,52 @@
+{
+  "name": "theazo",
+  "version": "0.1.0",
+  "description": "Theazo SDK — Agent infrastructure for developers",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist",
+    "lint": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "typescript": "^5.5.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/theazo/theazo-node.git",
+    "directory": "packages/theazo"
+  },
+  "homepage": "https://theazo.com",
+  "bugs": "https://github.com/theazo/theazo-node/issues",
+  "keywords": [
+    "ai",
+    "agents",
+    "infrastructure",
+    "orchestration",
+    "sdk",
+    "multi-tenant",
+    "compute",
+    "e2b",
+    "sandbox"
+  ],
+  "license": "MIT",
+  "author": "Theazo"
+}
