@@ -7,5 +7,19 @@
   "access": "public",
   "baseBranch": "main",
   "updateInternalDependencies": "patch",
-  "ignore": []
+  "ignore": [
+    "agent-definitions-example",
+    "approvals-example",
+    "basic-agent-example",
+    "byoi-example",
+    "channels-example",
+    "chat-example",
+    "fleet-dispatch-example",
+    "infra-only-example",
+    "knowledge-example",
+    "mcp-tools-example",
+    "scheduling-example",
+    "streaming-example",
+    "workflows-example"
+  ]
 }
