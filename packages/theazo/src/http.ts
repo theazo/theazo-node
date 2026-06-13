@@ -110,6 +110,20 @@ export class HttpClient {
   }
 
   async *stream<T>(path: string, query?: Record<string, string | number | boolean | undefined>): AsyncIterable<T> {
+    yield* this.consumeSSE<T>('GET', path, undefined, query)
+  }
+
+  async *streamPost<T>(path: string, body: unknown, signal?: AbortSignal): AsyncIterable<T> {
+    yield* this.consumeSSE<T>('POST', path, body, undefined, signal)
+  }
+
+  private async *consumeSSE<T>(
+    method: string,
+    path: string,
+    body?: unknown,
+    query?: Record<string, string | number | boolean | undefined>,
+    signal?: AbortSignal,
+  ): AsyncIterable<T> {
     let url = `${this.baseUrl}${path}`
 
     if (query) {
@@ -122,11 +136,13 @@ export class HttpClient {
     }
 
     const response = await fetch(url, {
-      method: 'GET',
+      method,
       headers: {
         ...this.headers(),
         'Accept': 'text/event-stream',
       },
+      body: body ? JSON.stringify(body) : undefined,
+      signal,
     })
 
     if (!response.ok) {
@@ -138,6 +154,7 @@ export class HttpClient {
     const reader = response.body.getReader()
     const decoder = new TextDecoder()
     let buffer = ''
+    let currentEvent = ''
 
     try {
       while (true) {
@@ -149,12 +166,15 @@ export class HttpClient {
         buffer = lines.pop() ?? ''
 
         for (const line of lines) {
-          if (line.startsWith('data: ')) {
+          if (line.startsWith('event: ')) {
+            currentEvent = line.slice(7).trim()
+          } else if (line.startsWith('data: ')) {
             const data = line.slice(6).trim()
             if (data === '[DONE]') return
             if (data) {
               yield JSON.parse(data) as T
             }
+            currentEvent = ''
           }
         }
       }

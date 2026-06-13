@@ -39,8 +39,11 @@ export interface SessionLimits {
   maxDuration?: Duration
 }
 
+export type SessionEnvironment = 'production' | 'staging' | 'development'
+
 export interface SessionCreateOpts {
   userId: string
+  environment?: SessionEnvironment
   limits?: SessionLimits
   metadata?: Record<string, string>
 }
@@ -54,6 +57,7 @@ export interface SessionData {
   id: string // 'ses_a1b2c3'
   userId: string
   status: 'active' | 'paused' | 'terminated'
+  environment: SessionEnvironment
   metadata: Record<string, string>
   limits: SessionLimits
   createdAt: string // ISO 8601
@@ -121,7 +125,8 @@ export interface AgentCreateOpts {
   browser?: boolean
   storage?: string
   gpu?: string
-  model?: string
+  /** Model ID string ('anthropic/claude-sonnet') or per-agent BYOI config. */
+  model?: string | AgentModelConfig
   instructions?: string
   tools?: string[]
   timeout?: string
@@ -179,6 +184,10 @@ export interface ToolCall {
   tool: string
   input: Record<string, unknown>
   output: string
+}
+
+export interface RunOpts {
+  maxCost?: Cost // Per-run cost cap — kills the run if exceeded
 }
 
 export interface RunResult {
@@ -274,6 +283,8 @@ export interface FileUploadOpts {
   file: Buffer | Uint8Array
   filename: string
   purpose: 'agent_input' | 'agent_output' | 'knowledge'
+  autoIngest?: boolean    // If true and purpose === 'knowledge', auto-chunk + embed
+  collection?: string     // Knowledge collection to ingest into
 }
 
 export interface FileData {
@@ -342,70 +353,167 @@ export interface AgentDefinitionVersion {
 
 export interface WorkflowStepBase {
   id: string
+  type: string
   dependsOn?: string[]
+  onStepFailure?: { action: 'goto'; target: string } | { action: 'retry' | 'skip' | 'pause' | 'abort' }
+  outputSchema?: Record<string, unknown>
+  onValidationFailure?: 'retry' | 'fail' | 'warn' | 'coerce'
 }
 
 export interface WorkflowAgentStep extends WorkflowStepBase {
+  type: 'agent'
   agent: string
+  inputMap?: Record<string, string>
   trigger?: string
-  inputMap?: Record<string, string> // JSONPath strings
+  timeout?: string
+  env?: Record<string, string | { secretRef: string }>
+  stateWrites?: string[]
+  stateReads?: string[]
 }
 
 export interface WorkflowParallelStep extends WorkflowStepBase {
-  parallel: WorkflowStep[]
+  type: 'parallel'
+  branches: WorkflowStep[]
 }
 
 export interface WorkflowConditionStep extends WorkflowStepBase {
-  condition: {
-    if: string
-    then: { agent: string }
-    else: { agent: string; delay?: string }
-  }
+  type: 'condition'
+  if: string
+  then: string | { agent?: string; delay?: string }
+  else?: string | { agent?: string; delay?: string }
 }
 
-export type WorkflowStep = WorkflowAgentStep | WorkflowParallelStep | WorkflowConditionStep
+export interface WorkflowDelayStep extends WorkflowStepBase {
+  type: 'delay'
+  duration: string
+}
+
+export interface WorkflowApprovalStep extends WorkflowStepBase {
+  type: 'approval'
+  action: string
+  params?: Record<string, unknown>
+  timeout?: string
+  defaultAction?: 'approve' | 'deny'
+}
+
+export interface WorkflowWebhookStep extends WorkflowStepBase {
+  type: 'webhook'
+  url: string
+  method?: 'GET' | 'POST'
+  headers?: Record<string, string>
+  body?: Record<string, unknown>
+  auth?: { type: 'bearer'; secretRef: string }
+  timeout?: string
+}
+
+export interface WorkflowTransformStep extends WorkflowStepBase {
+  type: 'transform'
+  expression: Record<string, string>
+}
+
+export interface WorkflowMapStep extends WorkflowStepBase {
+  type: 'map'
+  over: string
+  step: WorkflowAgentStep
+  concurrency?: number
+  onItemFailure?: 'skip' | 'abort' | 'retry'
+}
+
+export interface WorkflowPlannerStep extends WorkflowStepBase {
+  type: 'planner'
+  agent: string
+  description?: string
+  maxSteps?: number
+  allowedStepTypes?: string[]
+  requireApproval?: boolean
+  maxSpawnedCost?: Cost
+}
+
+export type WorkflowStep =
+  | WorkflowAgentStep
+  | WorkflowParallelStep
+  | WorkflowConditionStep
+  | WorkflowDelayStep
+  | WorkflowApprovalStep
+  | WorkflowWebhookStep
+  | WorkflowTransformStep
+  | WorkflowMapStep
+  | WorkflowPlannerStep
+
+export interface WorkflowPolicy {
+  allowTools?: string[]
+  denyTools?: string[]
+  requireApprovalFor?: string[]
+  maxCostPerStep?: Cost
+  maxTotalCost?: Cost
+  maxStepsTotal?: number
+  maxParallel?: number
+}
 
 export interface RetryConfig {
   maxAttempts: number
   delay: string
-  backoff?: 'linear' | 'exponential'
+  backoff?: 'fixed' | 'exponential'
 }
 
 export interface WorkflowCreateOpts {
   name: string
+  description?: string
   steps: WorkflowStep[]
+  inputSchema?: Record<string, unknown>
+  outputSchema?: Record<string, unknown>
+  policy?: WorkflowPolicy
   onFailure?: 'pause' | 'retry' | 'skip' | 'abort'
   retries?: RetryConfig
   timeout?: string
 }
 
 export interface Workflow {
-  id: string // 'wf_abc'
+  id: string
   name: string
+  description?: string
+  version: number
   steps: WorkflowStep[]
+  inputSchema?: Record<string, unknown>
+  outputSchema?: Record<string, unknown>
+  policy?: WorkflowPolicy
   onFailure: string
-  retries: RetryConfig
-  timeout: string
+  retries?: RetryConfig
+  timeout?: string
   createdAt: string
+  updatedAt: string
 }
 
 export interface WorkflowRunStepResult {
   status: 'pending' | 'running' | 'completed' | 'failed' | 'skipped'
   output?: unknown
-  cost?: Cost
-  duration?: string
+  cost: number
+  duration?: number
+  agentId?: string
+  error?: string
 }
 
 export interface WorkflowRun {
-  id: string // 'wfr_abc'
+  id: string
   workflowId: string
-  status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled'
-  currentStep: string
-  progress: string
+  workflowVersion?: number
+  status: 'pending' | 'running' | 'completed' | 'partial' | 'failed' | 'paused' | 'cancelled'
+  currentStepId?: string
   stepResults: Record<string, WorkflowRunStepResult>
+  sharedState: Record<string, unknown>
   totalCost: Cost
-  duration: string
+  canRetryFrom?: string
+  idempotencyKey?: string
   createdAt: string
+  startedAt?: string
+  completedAt?: string
+}
+
+export interface WorkflowRunOpts {
+  userId: string
+  sessionId: string
+  input?: Record<string, unknown>
+  idempotencyKey?: string
 }
 
 export interface WorkflowRunFilters extends PaginationParams {
@@ -418,6 +526,20 @@ export interface WorkflowScheduleOpts {
   userId: string
   input?: Record<string, unknown>
   timezone?: string
+}
+
+export interface WorkflowEstimate {
+  estimated: { min: number; max: number; currency: string }
+  confidence: 'low' | 'medium' | 'high'
+  breakdown: { stepId: string; type: string; estimated: { min: number; max: number } }[]
+  basedOn: number
+}
+
+export interface WorkflowStreamEvent {
+  event: string
+  runId?: string
+  stepId?: string
+  [key: string]: unknown
 }
 
 // ─── Fleets ─────────────────────────────────────────────────────────
@@ -521,8 +643,14 @@ export interface DenyOpts {
 
 // ─── Knowledge ──────────────────────────────────────────────────────
 
+export interface KnowledgeUploadFile {
+  filename: string
+  content: Buffer | Uint8Array
+  mimeType?: string
+}
+
 export interface KnowledgeUploadOpts {
-  files: (Buffer | Uint8Array)[]
+  files: KnowledgeUploadFile[]
   collection?: string
 }
 
@@ -552,6 +680,16 @@ export interface KnowledgeStats {
   totalChunks: number
   totalTokens: number
   storageGB: number
+}
+
+export interface KnowledgeSourceData {
+  id: string
+  source: 'upload' | 'notion' | 'google_drive' | 'confluence' | 'github' | 'url'
+  status: 'active' | 'syncing' | 'error'
+  collection?: string
+  syncSchedule?: string
+  chunkCount: number
+  createdAt: string
 }
 
 // ─── Schedules & Triggers ───────────────────────────────────────────
@@ -795,6 +933,42 @@ export interface UsageExportOpts {
   format: 'stripe' | 'csv' | 'json'
 }
 
+// ─── Billing ────────────────────────────────────────────────────────
+
+export type BillingPlan = 'free' | 'cloud' | 'enterprise'
+
+export interface BillingSubscription {
+  id: string
+  plan: BillingPlan
+  status: 'active' | 'trialing' | 'past_due' | 'cancelled'
+  currentPeriodStart: string
+  currentPeriodEnd: string
+  cancelAtPeriodEnd: boolean
+}
+
+export interface BillingBudgetConfig {
+  monthly: Cost
+  alerts?: {
+    threshold: number // 0.0 to 1.0
+    channel?: 'webhook'
+    action?: 'pause_all' | 'pause_user'
+  }[]
+}
+
+export interface BillingBudgetStatus {
+  budget: Cost
+  spent: Cost
+  remaining: Cost
+  percentage: number
+  alerts: { threshold: number; fired: boolean }[]
+}
+
+export interface BillingCheckoutOpts {
+  plan: BillingPlan
+  successUrl: string
+  cancelUrl: string
+}
+
 // ─── Webhooks ───────────────────────────────────────────────────────
 
 export interface WebhookCreateOpts {
@@ -854,8 +1028,22 @@ export interface ComputeProviderConfig {
 }
 
 export interface ModelProviderConfig {
-  provider: string
-  credentials: Record<string, string>
+  provider?: string
+  credentials?: Record<string, string>
+  baseUrl?: string
+  credentialRef?: string
+}
+
+/** Per-agent model override. Allows mixing managed + BYOI models in the same session. */
+export interface AgentModelConfig {
+  /** Model provider for direct BYOI ('anthropic' | 'openai'). Omit for gateway BYOI. */
+  provider?: string
+  /** OpenAI-compatible gateway URL (OpenRouter, LiteLLM, Azure, vLLM, Ollama). */
+  baseUrl?: string
+  /** Reference to API key stored in secrets vault. */
+  credentialRef?: string
+  /** Model name/ID at the provider or gateway (e.g. 'gpt-4o', 'agentco/research-v3'). */
+  name?: string
 }
 
 export interface TheazoConfig {
@@ -872,7 +1060,7 @@ export interface TheazoConfig {
 export type ContextStrategy = 'full' | 'sliding_window' | 'summarize'
 
 export interface ChatContextConfig {
-  strategy: ContextStrategy
+  strategy?: ContextStrategy  // omit for raw pass-through (no context management)
   maxTokens?: number
   summarizeAfter?: number
 }
@@ -889,6 +1077,7 @@ export interface ChatCreateOpts {
 export interface ChatSendOpts {
   content: string
   attachments?: string[]
+  signal?: AbortSignal
 }
 
 export interface ChatMessageListOpts extends PaginationParams {
@@ -992,7 +1181,7 @@ export type ChatStreamEvent =
 // ─── MCP ────────────────────────────────────────────────────────────
 
 export type MCPTransport = 'sse' | 'streamable-http' | 'stdio'
-export type MCPConnectionStatus = 'connected' | 'disconnected' | 'error'
+export type MCPConnectionStatus = 'connected' | 'disconnected' | 'error' | 'configured'
 export type MCPCredentialMode = 'platform' | 'per_user'
 
 export interface MCPConnectOpts {
@@ -1004,7 +1193,7 @@ export interface MCPConnectOpts {
   args?: string[]
   toolFilter?: string[] | null
   requiresApproval?: string[]
-  credentials?: MCPCredentialMode
+  credentialsType?: MCPCredentialMode
 }
 
 export interface MCPConnection {
@@ -1015,7 +1204,7 @@ export interface MCPConnection {
   command: string | null
   args: string[] | null
   status: MCPConnectionStatus
-  credentials: MCPCredentialMode
+  credentialsType: MCPCredentialMode
   toolFilter: string[] | null
   requiresApproval: string[]
   toolCount: number

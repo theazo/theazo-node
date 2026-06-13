@@ -15,8 +15,8 @@ const theazo = new Theazo({ apiKey: process.env.THEAZO_API_KEY! })
 async function main() {
   const session = await theazo.sessions.forUser('fleet_user')
 
-  // Dispatch 10 research tasks in parallel
-  const fleet = await session.fleet.dispatch({
+  // Dispatch 10 research tasks in parallel (max 3 at a time)
+  const fleet = await session.fleets.dispatch({
     agent: 'researcher',
     inputs: [
       { company: 'Stripe' },
@@ -24,22 +24,16 @@ async function main() {
       { company: 'Supabase' },
       { company: 'E2B' },
       { company: 'Anthropic' },
-      { company: 'OpenAI' },
-      { company: 'Modal' },
-      { company: 'Fly.io' },
-      { company: 'Replicate' },
-      { company: 'Hugging Face' },
     ],
-    concurrency: 3, // max 3 running at once
+    concurrency: 3,
   })
 
-  console.log('Fleet:', fleet.id)
-  console.log('Total items:', fleet.totalItems)
+  console.log('Fleet:', fleet.id, '— status:', fleet.currentStatus)
 
-  // Poll for completion
-  const status = await fleet.status()
-  console.log('Completed:', status.progress.completed)
-  console.log('Total cost:', status.totalCost)
+  // Stream results as they complete
+  for await (const item of fleet.stream()) {
+    console.log(`Done: ${item.input.company} — $${(item.cost / 100).toFixed(2)}`)
+  }
 }
 
 main().catch(console.error)

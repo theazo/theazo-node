@@ -13,8 +13,10 @@ import { Theazo } from 'theazo'
 const theazo = new Theazo({ apiKey: process.env.THEAZO_API_KEY! })
 
 async function main() {
+  const session = await theazo.sessions.forUser('knowledge_user')
+
   // Upload a document to a knowledge collection
-  await theazo.knowledge.upload({
+  await session.knowledge.upload({
     collection: 'company-docs',
     source: 'text',
     content: `
@@ -28,7 +30,6 @@ async function main() {
   console.log('Document uploaded')
 
   // Agent automatically searches the knowledge base when needed
-  const session = await theazo.sessions.forUser('knowledge_user')
   const result = await session.run('assistant', 'What is the Pro plan pricing?', {
     knowledge: 'company-docs',
   })

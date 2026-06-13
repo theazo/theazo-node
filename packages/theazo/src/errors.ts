@@ -21,6 +21,14 @@ export type TheazoErrorCode =
   | 'knowledge_quota_exceeded'
   | 'tool_handler_unreachable'
   | 'guardrail_blocked'
+  // MCP
+  | 'mcp_connect_failed'
+  | 'mcp_refresh_failed'
+  | 'mcp_server_unreachable'
+  | 'mcp_name_conflict'
+  | 'approval_required'
+  | 'redis_required'
+  | 'redis_unavailable'
   // Client
   | 'connection_error'
   | 'timeout'

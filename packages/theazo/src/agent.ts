@@ -5,6 +5,7 @@ import type {
   ExecResult,
   FileEntry,
   RunResult,
+  RunOpts,
   Snapshot,
   StreamEvent,
   ResumeOpts,
@@ -52,8 +53,11 @@ export class Agent {
     this.http = http
   }
 
-  async run(task: string): Promise<RunResult> {
-    return this.http.post<RunResult>(`/v1/agents/${this.id}/run`, { task })
+  async run(task: string, opts?: RunOpts): Promise<RunResult> {
+    return this.http.post<RunResult>(`/v1/agents/${this.id}/run`, {
+      task,
+      ...(opts?.maxCost ? { maxCost: opts.maxCost } : {}),
+    })
   }
 
   async *stream(task: string): AsyncIterable<StreamEvent> {

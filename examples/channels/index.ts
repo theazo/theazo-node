@@ -26,13 +26,13 @@ async function main() {
   })
 
   console.log('Channel:', channel.id)
-  console.log('Widget endpoints:')
-  console.log('  Send:', channel.endpoints.send)
-  console.log('  History:', channel.endpoints.history)
-  console.log('  Stream:', channel.endpoints.stream)
 
-  // Your frontend calls these endpoints directly (no API key needed)
-  // POST /channels/:id/messages { text: "...", visitorId: "..." }
+  // Your frontend sends messages to the public endpoint (no API key needed):
+  //   POST https://api.theazo.com/channels/{channel.id}/messages
+  //   Body: { "text": "How do I reset my password?", "visitorId": "vis_abc" }
+  //
+  // Stream responses via SSE:
+  //   GET https://api.theazo.com/channels/{channel.id}/stream?visitorId=vis_abc
 }
 
 main().catch(console.error)

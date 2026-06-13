@@ -11,10 +11,12 @@ import type {
   FleetItemResult,
   FleetResultsFilters,
   KnowledgeUploadOpts,
+  KnowledgeUploadFile,
   KnowledgeSyncOpts,
   KnowledgeQueryOpts,
   KnowledgeResult,
   KnowledgeStats,
+  KnowledgeSourceData,
   LimitsStatus,
   PaginatedList,
   RunResult,
@@ -89,6 +91,8 @@ export interface SessionKnowledge {
   query(q: string, opts?: KnowledgeQueryOpts): Promise<KnowledgeResult[]>
   stats(): Promise<KnowledgeStats>
   deleteCollection(name: string): Promise<void>
+  sources(): Promise<KnowledgeSourceData[]>
+  deleteSource(id: string): Promise<void>
 }
 
 export interface SessionTasks {
@@ -259,25 +263,45 @@ export class Session {
 
   readonly knowledge: SessionKnowledge = {
     upload: async (opts: KnowledgeUploadOpts): Promise<void> => {
-      await this.http.post(`/v1/sessions/${this.id}/knowledge/upload`, {
+      await this.http.post(`/v1/knowledge/upload`, {
+        userId: this.userId,
         collection: opts.collection,
-        fileCount: opts.files.length,
+        files: opts.files.map((f: KnowledgeUploadFile) => ({
+          filename: f.filename,
+          data: Buffer.from(f.content).toString('base64'),
+          mimeType: f.mimeType,
+        })),
       })
     },
     sync: async (opts: KnowledgeSyncOpts): Promise<void> => {
-      await this.http.post(`/v1/sessions/${this.id}/knowledge/sync`, opts)
-    },
-    query: async (q: string, opts?: KnowledgeQueryOpts): Promise<KnowledgeResult[]> => {
-      return this.http.post<KnowledgeResult[]>(`/v1/sessions/${this.id}/knowledge/query`, {
-        query: q,
-        ...opts,
+      await this.http.post(`/v1/knowledge/sync`, {
+        userId: this.userId,
+        source: opts.source,
+        collection: opts.collection,
+        syncSchedule: opts.schedule,
       })
     },
+    query: async (q: string, opts?: KnowledgeQueryOpts): Promise<KnowledgeResult[]> => {
+      const result = await this.http.post<{ data: KnowledgeResult[] }>(`/v1/knowledge/query`, {
+        userId: this.userId,
+        query: q,
+        collection: opts?.collection,
+        topK: opts?.topK,
+      })
+      return result.data
+    },
     stats: async (): Promise<KnowledgeStats> => {
-      return this.http.get<KnowledgeStats>(`/v1/sessions/${this.id}/knowledge/stats`)
+      return this.http.get<KnowledgeStats>(`/v1/knowledge/stats`, { userId: this.userId })
     },
     deleteCollection: async (name: string): Promise<void> => {
-      await this.http.delete(`/v1/sessions/${this.id}/knowledge/collections/${encodeURIComponent(name)}`)
+      await this.http.delete(`/v1/knowledge/collections/${encodeURIComponent(name)}?userId=${encodeURIComponent(this.userId)}`)
+    },
+    sources: async (): Promise<KnowledgeSourceData[]> => {
+      const result = await this.http.get<{ data: KnowledgeSourceData[] }>(`/v1/knowledge/sources`, { userId: this.userId })
+      return result.data
+    },
+    deleteSource: async (id: string): Promise<void> => {
+      await this.http.delete(`/v1/knowledge/sources/${id}?userId=${encodeURIComponent(this.userId)}`)
     },
   }
 
@@ -350,9 +374,9 @@ export class Session {
     send: async (conversationId: string, opts: ChatSendOpts): Promise<ChatMessage> => {
       return this.http.post<ChatMessage>(`/v1/chat/${conversationId}/messages`, opts)
     },
-    stream: async function* (conversationId: string, opts: ChatSendOpts): AsyncIterable<ChatStreamEvent> {
-      // SSE streaming endpoint
-      yield* [] as ChatStreamEvent[]
+    stream: (conversationId: string, opts: ChatSendOpts & { signal?: AbortSignal }): AsyncIterable<ChatStreamEvent> => {
+      const { signal, ...body } = opts
+      return this.http.streamPost<ChatStreamEvent>(`/v1/chat/${conversationId}/messages/stream`, body, signal)
     },
     messages: async (conversationId: string, opts?: ChatMessageListOpts): Promise<{ data: ChatMessage[]; hasMore: boolean }> => {
       return this.http.get(`/v1/chat/${conversationId}/messages`, {

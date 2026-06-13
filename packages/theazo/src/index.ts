@@ -69,6 +69,11 @@ import type {
   PhoneCreateOpts,
   ChannelUpdateOpts,
   ChannelConversation,
+  BillingPlan,
+  BillingSubscription,
+  BillingBudgetConfig,
+  BillingBudgetStatus,
+  BillingCheckoutOpts,
 } from './types.js'
 
 const DEFAULT_BASE_URL = 'https://api.theazo.com'
@@ -175,12 +180,16 @@ class WorkflowsNamespace {
     await this.http.delete(`/v1/workflows/${id}`)
   }
 
+  async run(workflowId: string, opts: import('./types.js').WorkflowRunOpts): Promise<import('./types.js').WorkflowRun> {
+    return this.http.post(`/v1/workflows/${workflowId}/runs`, opts)
+  }
+
   async getRun(runId: string): Promise<import('./types.js').WorkflowRun> {
-    return this.http.get(`/v1/workflows/runs/${runId}`)
+    return this.http.get(`/v1/workflow-runs/${runId}`)
   }
 
   async runs(filters?: import('./types.js').WorkflowRunFilters): Promise<PaginatedList<import('./types.js').WorkflowRun>> {
-    return this.http.get('/v1/workflows/runs', {
+    return this.http.get('/v1/workflow-runs', {
       workflowId: filters?.workflowId,
       status: filters?.status,
       limit: filters?.limit,
@@ -189,11 +198,19 @@ class WorkflowsNamespace {
   }
 
   async cancelRun(runId: string): Promise<void> {
-    await this.http.post(`/v1/workflows/runs/${runId}/cancel`)
+    await this.http.post(`/v1/workflow-runs/${runId}/cancel`)
   }
 
   async retryRun(runId: string): Promise<void> {
-    await this.http.post(`/v1/workflows/runs/${runId}/retry`)
+    await this.http.post(`/v1/workflow-runs/${runId}/retry`)
+  }
+
+  async *streamRun(runId: string): AsyncIterable<import('./types.js').WorkflowStreamEvent> {
+    yield* this.http.stream<import('./types.js').WorkflowStreamEvent>(`/v1/workflow-runs/${runId}/stream`)
+  }
+
+  async estimate(workflowId: string, opts?: { input?: Record<string, unknown> }): Promise<import('./types.js').WorkflowEstimate> {
+    return this.http.post(`/v1/workflows/${workflowId}/estimate`, opts ?? {})
   }
 
   async schedule(id: string, opts: import('./types.js').WorkflowScheduleOpts): Promise<Schedule> {
@@ -550,6 +567,8 @@ class FilesNamespace {
       filename: opts.filename,
       purpose: opts.purpose,
       data: Buffer.from(opts.file).toString('base64'),
+      ...(opts.autoIngest !== undefined ? { autoIngest: opts.autoIngest } : {}),
+      ...(opts.collection ? { collection: opts.collection } : {}),
     })
   }
 
@@ -579,6 +598,38 @@ class FilesNamespace {
   }
 }
 
+class BillingNamespace {
+  constructor(private http: HttpClient) {}
+
+  async getSubscription(): Promise<BillingSubscription | null> {
+    return this.http.get<BillingSubscription | null>('/v1/billing/subscription')
+  }
+
+  async createCheckout(opts: BillingCheckoutOpts): Promise<{ url: string }> {
+    return this.http.post<{ url: string }>('/v1/billing/checkout', opts)
+  }
+
+  async getPortalUrl(): Promise<{ url: string }> {
+    return this.http.get<{ url: string }>('/v1/billing/portal')
+  }
+
+  async setBudget(config: BillingBudgetConfig): Promise<void> {
+    await this.http.post('/v1/billing/budget', config)
+  }
+
+  async getBudget(): Promise<BillingBudgetStatus> {
+    return this.http.get<BillingBudgetStatus>('/v1/billing/budget')
+  }
+
+  async setUserBudget(config: BillingBudgetConfig): Promise<void> {
+    await this.http.post('/v1/billing/user-budget', config)
+  }
+
+  async getCreditBalance(): Promise<{ credits: number; currency: string }> {
+    return this.http.get<{ credits: number; currency: string }>('/v1/billing/credits')
+  }
+}
+
 // ─── Main Theazo Class ──────────────────────────────────────────────
 
 export class Theazo {
@@ -595,6 +646,7 @@ export class Theazo {
   readonly metrics: MetricsNamespace
   readonly traces: TracesNamespace
   readonly usage: UsageNamespace
+  readonly billing: BillingNamespace
   readonly guardrails: GuardrailsNamespace
   readonly webhooks: WebhooksNamespace
   readonly mcp: MCPNamespace
@@ -622,6 +674,7 @@ export class Theazo {
     this.metrics = new MetricsNamespace(this.http)
     this.traces = new TracesNamespace(this.http)
     this.usage = new UsageNamespace(this.http)
+    this.billing = new BillingNamespace(this.http)
     this.guardrails = new GuardrailsNamespace(this.http)
     this.webhooks = new WebhooksNamespace(this.http)
     this.mcp = new MCPNamespace(this.http)
@@ -637,4 +690,5 @@ export type { TheazoErrorCode } from './errors.js'
 export { Session } from './session.js'
 export { FleetInstance, TeamInstance } from './session.js'
 export { Agent } from './agent.js'
+export { workflow, WorkflowBuilder } from './workflow-builder.js'
 export type * from './types.js'
