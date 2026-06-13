@@ -8,6 +8,7 @@
   "baseBranch": "main",
   "updateInternalDependencies": "patch",
   "ignore": [
+    "theazo-sandbox",
     "agent-definitions-example",
     "approvals-example",
     "basic-agent-example",
