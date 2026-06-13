@@ -1,6 +1,6 @@
 {
   "name": "theazo",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Theazo — AI operating infrastructure for startups and enterprises. Agent primitives (workflows, fleets, chat, RAG, MCP), sandboxed compute, multi-tenant sessions, per-user billing, observability. Bring your own compute + models or use ours.",
   "type": "module",
   "main": "./dist/index.js",
