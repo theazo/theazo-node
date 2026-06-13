@@ -7,11 +7,11 @@
 <h1 align="center">theazo</h1>
 
 <p align="center">
-  <strong>Agent infrastructure for production.</strong>
+  <strong>AI operating infrastructure for startups and enterprises.</strong>
   <br />
-  Sandboxed compute, workflows, fleets, chat, RAG, MCP tools, per-user billing, BYOI.
+  Agent primitives, sandboxed compute, multi-tenant sessions, observability.
   <br />
-  One SDK to replace 12-16 weeks of infrastructure.
+  Bring your own compute + models, or use ours. One SDK.
 </p>
 
 <p align="center">
@@ -46,9 +46,9 @@ console.log(result.cost)     // { amount: 3, currency: 'usd' }
 
 ---
 
-## Infrastructure
+## AI Infrastructure
 
-Everything you'd spend 12-16 weeks building, included out of the box.
+The operating layer every AI agent company needs — included out of the box.
 
 | | |
 |---|---|
@@ -61,7 +61,7 @@ Everything you'd spend 12-16 weeks building, included out of the box.
 | **Model Gateway** | 500+ models. Managed or BYOI (direct key, OpenRouter, LiteLLM, Azure, vLLM, Ollama) |
 | **Secrets Vault** | AES-256-GCM encrypted credentials. Injected at runtime. Never logged. |
 
-## Primitives
+## AI Primitives
 
 Agent orchestration building blocks. Your product, Theazo's backend.
 
