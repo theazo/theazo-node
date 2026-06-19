@@ -230,14 +230,15 @@ export class Session {
       return new Agent(data, this.http)
     },
     list: async (filters?: AgentListFilters): Promise<Agent[]> => {
-      const data = await this.http.get<AgentData[]>(`/v1/sessions/${this.id}/agents`, {
+      const result = await this.http.get<{ data: AgentData[] } | AgentData[]>(`/v1/sessions/${this.id}/agents`, {
         status: filters?.status,
         provider: filters?.provider,
         compute: filters?.compute,
         limit: filters?.limit,
         cursor: filters?.cursor,
       })
-      return data.map(d => new Agent(d, this.http))
+      const arr = Array.isArray(result) ? result : (result.data ?? [])
+      return arr.map(d => new Agent(d, this.http))
     },
   }
 

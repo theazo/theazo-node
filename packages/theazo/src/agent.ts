@@ -61,13 +61,16 @@ export class Agent {
   }
 
   async *stream(task: string): AsyncIterable<StreamEvent> {
-    // POST to start the stream, then read SSE
-    await this.http.post(`/v1/agents/${this.id}/run`, { task, stream: true })
-    yield* this.http.stream<StreamEvent>(`/v1/agents/${this.id}/stream`)
+    // Start SSE connection first, then trigger the run.
+    // This avoids a race where events fire before the SSE listener is ready.
+    const ssePromise = this.http.stream<StreamEvent>(`/v1/agents/${this.id}/stream`)
+    // Fire-and-forget the run — events will flow through SSE
+    this.http.post(`/v1/agents/${this.id}/run`, { task, stream: true }).catch(() => {})
+    yield* ssePromise
   }
 
-  async exec(lang: string, code: string): Promise<ExecResult> {
-    return this.http.post<ExecResult>(`/v1/agents/${this.id}/exec`, { lang, code })
+  async exec(language: string, code: string): Promise<ExecResult> {
+    return this.http.post<ExecResult>(`/v1/agents/${this.id}/exec`, { language, code })
   }
 
   readonly files: AgentFiles = {

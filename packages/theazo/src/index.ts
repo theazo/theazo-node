@@ -117,23 +117,23 @@ class AgentsNamespace {
   constructor(private http: HttpClient) {}
 
   async define(opts: AgentDefinitionOpts): Promise<AgentDefinition> {
-    return this.http.post<AgentDefinition>('/v1/agents/definitions', opts)
+    return this.http.post<AgentDefinition>('/v1/agent-definitions', opts)
   }
 
   async definitions(): Promise<AgentDefinition[]> {
-    return this.http.get<AgentDefinition[]>('/v1/agents/definitions')
+    return this.http.get<AgentDefinition[]>('/v1/agent-definitions')
   }
 
   async updateDefinition(id: string, opts: AgentDefinitionUpdate): Promise<AgentDefinition> {
-    return this.http.patch<AgentDefinition>(`/v1/agents/definitions/${id}`, opts)
+    return this.http.patch<AgentDefinition>(`/v1/agent-definitions/${id}`, opts)
   }
 
   async rollback(id: string, opts: { version: number }): Promise<void> {
-    await this.http.post(`/v1/agents/definitions/${id}/rollback`, opts)
+    await this.http.post(`/v1/agent-definitions/${id}/rollback`, opts)
   }
 
   async versions(id: string): Promise<AgentDefinitionVersion[]> {
-    return this.http.get<AgentDefinitionVersion[]>(`/v1/agents/definitions/${id}/versions`)
+    return this.http.get<AgentDefinitionVersion[]>(`/v1/agent-definitions/${id}/versions`)
   }
 
   async get(id: string): Promise<Agent> {
@@ -165,7 +165,8 @@ class WorkflowsNamespace {
   }
 
   async list(): Promise<import('./types.js').Workflow[]> {
-    return this.http.get('/v1/workflows')
+    const result = await this.http.get<{ data: import('./types.js').Workflow[] } | import('./types.js').Workflow[]>('/v1/workflows')
+    return Array.isArray(result) ? result : (result.data ?? [])
   }
 
   async get(id: string): Promise<import('./types.js').Workflow> {
@@ -317,7 +318,7 @@ class LogsNamespace {
   constructor(private http: HttpClient) {}
 
   async query(filters?: LogQueryFilters): Promise<LogEntry[]> {
-    return this.http.get<LogEntry[]>('/v1/logs', {
+    const result = await this.http.get<{ data: LogEntry[] } | LogEntry[]>('/v1/logs', {
       sessionId: filters?.sessionId,
       agentId: filters?.agentId,
       level: filters?.level,
@@ -326,6 +327,7 @@ class LogsNamespace {
       until: filters?.until,
       limit: filters?.limit,
     })
+    return Array.isArray(result) ? result : (result.data ?? [])
   }
 
   async *stream(filters?: LogStreamFilters): AsyncIterable<LogEntry> {
@@ -410,7 +412,7 @@ class GuardrailsNamespace {
   constructor(private http: HttpClient) {}
 
   async configure(opts: GuardrailConfig): Promise<void> {
-    await this.http.post('/v1/guardrails', opts)
+    await this.http.put('/v1/guardrails', opts)
   }
 
   async get(): Promise<GuardrailConfig> {
@@ -418,9 +420,10 @@ class GuardrailsNamespace {
   }
 
   async violations(filters?: GuardrailViolationFilters): Promise<GuardrailViolation[]> {
-    return this.http.get<GuardrailViolation[]>('/v1/guardrails/violations', {
+    const result = await this.http.get<{ data: GuardrailViolation[] } | GuardrailViolation[]>('/v1/guardrails/violations', {
       period: filters?.period,
     })
+    return Array.isArray(result) ? result : (result.data ?? [])
   }
 }
 

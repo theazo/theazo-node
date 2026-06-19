@@ -197,7 +197,7 @@ export interface RunResult {
   duration: string // Human-readable '3m 12s'
   durationMs: number
   provider: string
-  toolCalls: ToolCall[]
+  toolCalls: ToolCall[] | null
 }
 
 export interface ExecResult {
@@ -935,7 +935,7 @@ export interface UsageExportOpts {
 
 // ─── Billing ────────────────────────────────────────────────────────
 
-export type BillingPlan = 'free' | 'cloud' | 'enterprise'
+export type BillingPlan = 'free' | 'pro' | 'enterprise'
 
 export interface BillingSubscription {
   id: string
