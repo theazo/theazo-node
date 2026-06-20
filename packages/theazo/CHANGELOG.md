@@ -4,7 +4,17 @@
 
 ### Patch Changes
 
-- ef61838: Sync SDK with platform: fix agent streaming race condition, rename exec param to language, fix agent-definitions endpoint paths, handle wrapped API responses, fix guardrails to use PUT, update BillingPlan type, allow nullable toolCalls
+- Sync SDK with platform monorepo:
+
+  - Fix `agent.exec()` param rename: `lang` -> `language`
+  - Fix agent definition routes: `/v1/agents/definitions` -> `/v1/agent-definitions`
+  - Fix `updateDefinition` to use PUT instead of PATCH
+  - Fix `agent.run()` to normalize nullable `toolCalls` to empty array
+  - Fix `agent.files.list()` route: `/files/list` -> `/files`
+  - Fix `session.agents.list()` to handle both `{ data: [] }` and raw array responses
+  - Fix `team.run()` to poll async team runs until completion
+  - Update `BillingPlan` type: `cloud` -> `pro`
+  - Allow nullable `toolCalls` in `RunResult` type
 
 ## 0.1.1
 
