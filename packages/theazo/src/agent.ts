@@ -54,10 +54,12 @@ export class Agent {
   }
 
   async run(task: string, opts?: RunOpts): Promise<RunResult> {
-    return this.http.post<RunResult>(`/v1/agents/${this.id}/run`, {
+    const result = await this.http.post<RunResult>(`/v1/agents/${this.id}/run`, {
       task,
       ...(opts?.maxCost ? { maxCost: opts.maxCost } : {}),
     })
+    result.toolCalls = result.toolCalls ?? []
+    return result
   }
 
   async *stream(task: string): AsyncIterable<StreamEvent> {
@@ -92,7 +94,7 @@ export class Agent {
         : Buffer.from(result.data, 'utf-8')
     },
     list: async (dir?: string): Promise<FileEntry[]> => {
-      return this.http.get<FileEntry[]>(`/v1/agents/${this.id}/files/list`, {
+      return this.http.get<FileEntry[]>(`/v1/agents/${this.id}/files`, {
         dir: dir ?? '/data',
       })
     },

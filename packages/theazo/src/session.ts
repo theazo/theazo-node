@@ -166,7 +166,40 @@ export class TeamInstance {
   }
 
   async run(task: string): Promise<TeamResult> {
-    return this.http.post<TeamResult>(`/v1/teams/${this.id}/run`, { task })
+    const res = await this.http.post<{ runId: string; status: string }>(`/v1/teams/${this.id}/run`, { task })
+    const runId = res.runId
+
+    // Poll until the async team run completes
+    const pollInterval = 1000
+    const maxPollTime = 300_000 // 5 minutes
+    const start = Date.now()
+
+    while (Date.now() - start < maxPollTime) {
+      await new Promise(r => setTimeout(r, pollInterval))
+      const run = await this.http.get<{
+        status: string
+        output?: string | null
+        agentOutputs?: Record<string, string> | null
+        totalCost?: string | null
+        startedAt?: string | null
+        completedAt?: string | null
+      }>(`/v1/team-runs/${runId}`)
+
+      if (run.status === 'completed' || run.status === 'failed' || run.status === 'cancelled') {
+        const startMs = run.startedAt ? new Date(run.startedAt).getTime() : start
+        const endMs = run.completedAt ? new Date(run.completedAt).getTime() : Date.now()
+        const durationSec = ((endMs - startMs) / 1000).toFixed(1)
+
+        return {
+          output: run.output ?? '',
+          agentOutputs: (run.agentOutputs as Record<string, string>) ?? {},
+          cost: { amount: Math.round(parseFloat(run.totalCost ?? '0')), currency: 'usd' },
+          duration: `${durationSec}s`,
+        }
+      }
+    }
+
+    throw new Error(`Team run ${runId} timed out after ${maxPollTime / 1000}s`)
   }
 
   async cancel(): Promise<void> {

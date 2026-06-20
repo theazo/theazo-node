@@ -125,7 +125,7 @@ class AgentsNamespace {
   }
 
   async updateDefinition(id: string, opts: AgentDefinitionUpdate): Promise<AgentDefinition> {
-    return this.http.patch<AgentDefinition>(`/v1/agent-definitions/${id}`, opts)
+    return this.http.put<AgentDefinition>(`/v1/agent-definitions/${id}`, opts)
   }
 
   async rollback(id: string, opts: { version: number }): Promise<void> {
