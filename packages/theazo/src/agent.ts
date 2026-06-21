@@ -85,9 +85,9 @@ export class Agent {
       })
     },
     read: async (path: string): Promise<Buffer> => {
+      const cleanPath = path.startsWith('/') ? path.slice(1) : path
       const result = await this.http.get<{ data: string; encoding: string }>(
-        `/v1/agents/${this.id}/files`,
-        { path }
+        `/v1/agents/${this.id}/files/${cleanPath}`
       )
       return result.encoding === 'base64'
         ? Buffer.from(result.data, 'base64')

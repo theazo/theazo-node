@@ -1,5 +1,11 @@
 # theazo
 
+## 0.1.4
+
+### Patch Changes
+
+- Fix `agent.files.read()` to use path parameter instead of query parameter
+
 ## 0.1.3
 
 ### Patch Changes
