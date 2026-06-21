@@ -63,12 +63,50 @@ export class Agent {
   }
 
   async *stream(task: string): AsyncIterable<StreamEvent> {
-    // Start SSE connection first, then trigger the run.
-    // This avoids a race where events fire before the SSE listener is ready.
-    const ssePromise = this.http.stream<StreamEvent>(`/v1/agents/${this.id}/stream`)
-    // Fire-and-forget the run — events will flow through SSE
+    // Open SSE connection and wait for it to be established,
+    // THEN trigger the run so no events are missed.
+    const url = `${(this.http as unknown as { baseUrl: string }).baseUrl}/v1/agents/${this.id}/stream`
+    const headers = (this.http as unknown as { headers: () => Record<string, string> }).headers()
+
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: { ...headers, 'Accept': 'text/event-stream' },
+    })
+
+    if (!response.ok || !response.body) return
+
+    // SSE connection is open — now trigger the run
     this.http.post(`/v1/agents/${this.id}/run`, { task, stream: true }).catch(() => {})
-    yield* ssePromise
+
+    // Parse SSE events from the response stream
+    const reader = response.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() ?? ''
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = line.slice(6).trim()
+            if (data === '[DONE]') return
+            if (data) {
+              const parsed = JSON.parse(data) as StreamEvent
+              yield parsed
+              if (parsed.type === 'done') return
+            }
+          }
+        }
+      }
+    } finally {
+      reader.releaseLock()
+    }
   }
 
   async exec(language: string, code: string): Promise<ExecResult> {

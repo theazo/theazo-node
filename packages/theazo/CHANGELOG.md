@@ -1,5 +1,11 @@
 # theazo
 
+## 0.1.6
+
+### Patch Changes
+
+- Fix `agent.stream()` race condition: open SSE connection before triggering run to ensure no events are missed
+
 ## 0.1.5
 
 ### Patch Changes
