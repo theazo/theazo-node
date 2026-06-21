@@ -1,5 +1,16 @@
 # theazo
 
+## 0.1.3
+
+### Patch Changes
+
+- Fix remaining SDK route and method issues:
+
+  - Fix `updateDefinition` to use PUT instead of PATCH
+  - Fix `agent.run()` to normalize nullable `toolCalls` to empty array
+  - Fix `agent.files.list()` route: `/files/list` -> `/files`
+  - Fix `team.run()` to poll async team runs until completion
+
 ## 0.1.2
 
 ### Patch Changes
