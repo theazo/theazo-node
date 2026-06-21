@@ -125,7 +125,7 @@ export class FleetInstance {
   }
 
   async status(): Promise<FleetStatus> {
-    const s = await this.http.get<FleetStatus>(`/v1/fleets/${this.id}/status`)
+    const s = await this.http.get<FleetStatus>(`/v1/fleets/${this.id}`)
     this._status = s.status
     return s
   }

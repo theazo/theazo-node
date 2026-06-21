@@ -1,5 +1,11 @@
 # theazo
 
+## 0.1.5
+
+### Patch Changes
+
+- Fix `fleet.status()` route: `/v1/fleets/:id/status` -> `/v1/fleets/:id`
+
 ## 0.1.4
 
 ### Patch Changes
