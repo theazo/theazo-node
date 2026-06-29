@@ -321,6 +321,23 @@ describe('ApprovalsNamespace', () => {
       ids: ['apr_1', 'apr_2'],
     })
   })
+
+  it('get calls GET /v1/approvals/{id}', async () => {
+    mockHttp.get.mockResolvedValueOnce({ id: 'apr_1', status: 'pending' })
+    const result = await t.approvals.get('apr_1')
+
+    expect(mockHttp.get).toHaveBeenCalledWith('/v1/approvals/apr_1')
+    expect(result.status).toBe('pending')
+  })
+
+  it('bulkDeny calls POST /v1/approvals/bulk-deny', async () => {
+    mockHttp.post.mockResolvedValueOnce(undefined)
+    await t.approvals.bulkDeny(['apr_1', 'apr_2'])
+
+    expect(mockHttp.post).toHaveBeenCalledWith('/v1/approvals/bulk-deny', {
+      ids: ['apr_1', 'apr_2'],
+    })
+  })
 })
 
 describe('SchedulesNamespace', () => {
@@ -348,6 +365,28 @@ describe('SchedulesNamespace', () => {
     await t.schedules.history('sch_1')
 
     expect(mockHttp.get).toHaveBeenCalledWith('/v1/schedules/sch_1/history')
+  })
+
+  it('list calls GET /v1/schedules', async () => {
+    mockHttp.get.mockResolvedValueOnce([{ id: 'sch_1' }])
+    const result = await t.schedules.list()
+
+    expect(mockHttp.get).toHaveBeenCalledWith('/v1/schedules')
+    expect(result).toEqual([{ id: 'sch_1' }])
+  })
+
+  it('resume calls POST /v1/schedules/{id}/resume', async () => {
+    mockHttp.post.mockResolvedValueOnce(undefined)
+    await t.schedules.resume('sch_1')
+
+    expect(mockHttp.post).toHaveBeenCalledWith('/v1/schedules/sch_1/resume')
+  })
+
+  it('delete calls DELETE /v1/schedules/{id}', async () => {
+    mockHttp.delete.mockResolvedValueOnce(undefined)
+    await t.schedules.delete('sch_1')
+
+    expect(mockHttp.delete).toHaveBeenCalledWith('/v1/schedules/sch_1')
   })
 })
 
@@ -381,6 +420,14 @@ describe('ToolsNamespace', () => {
 
     expect(mockHttp.delete).toHaveBeenCalledWith('/v1/tools/my%20tool')
   })
+
+  it('list calls GET /v1/tools', async () => {
+    mockHttp.get.mockResolvedValueOnce([{ name: 'web_search' }])
+    const result = await t.tools.list()
+
+    expect(mockHttp.get).toHaveBeenCalledWith('/v1/tools')
+    expect(result).toEqual([{ name: 'web_search' }])
+  })
 })
 
 describe('UsageNamespace', () => {
@@ -398,6 +445,27 @@ describe('UsageNamespace', () => {
     await t.usage.forUser('user@co.com', { period: 'week' })
 
     expect(mockHttp.get).toHaveBeenCalledWith('/v1/usage/users/user%40co.com', { period: 'week' })
+  })
+
+  it('daily calls GET /v1/usage/daily', async () => {
+    mockHttp.get.mockResolvedValueOnce([{ date: '2026-01-01' }])
+    await t.usage.daily({ period: 'last_7_days' })
+
+    expect(mockHttp.get).toHaveBeenCalledWith('/v1/usage/daily', { period: 'last_7_days' })
+  })
+
+  it('byProvider calls GET /v1/usage/by-provider', async () => {
+    mockHttp.get.mockResolvedValueOnce({ e2b: { amount: 50, currency: 'usd' } })
+    await t.usage.byProvider({ period: 'month' })
+
+    expect(mockHttp.get).toHaveBeenCalledWith('/v1/usage/by-provider', { period: 'month' })
+  })
+
+  it('export calls GET /v1/usage/export', async () => {
+    mockHttp.get.mockResolvedValueOnce({})
+    await t.usage.export({ period: 'month', format: 'csv' })
+
+    expect(mockHttp.get).toHaveBeenCalledWith('/v1/usage/export', { period: 'month', format: 'csv' })
   })
 })
 
@@ -459,6 +527,14 @@ describe('GuardrailsNamespace', () => {
 
     expect(result).toEqual([{ id: 'v1' }])
   })
+
+  it('get calls GET /v1/guardrails', async () => {
+    mockHttp.get.mockResolvedValueOnce({ contentFilter: 'moderate', blockPII: true })
+    const result = await t.guardrails.get()
+
+    expect(mockHttp.get).toHaveBeenCalledWith('/v1/guardrails')
+    expect(result.blockPII).toBe(true)
+  })
 })
 
 describe('WebhooksNamespace', () => {
@@ -479,6 +555,21 @@ describe('WebhooksNamespace', () => {
     await t.webhooks.test('wh_1')
 
     expect(mockHttp.post).toHaveBeenCalledWith('/v1/webhooks/wh_1/test')
+  })
+
+  it('list calls GET /v1/webhooks', async () => {
+    mockHttp.get.mockResolvedValueOnce([{ id: 'wh_1' }])
+    const result = await t.webhooks.list()
+
+    expect(mockHttp.get).toHaveBeenCalledWith('/v1/webhooks')
+    expect(result).toEqual([{ id: 'wh_1' }])
+  })
+
+  it('delete calls DELETE /v1/webhooks/{id}', async () => {
+    mockHttp.delete.mockResolvedValueOnce(undefined)
+    await t.webhooks.delete('wh_1')
+
+    expect(mockHttp.delete).toHaveBeenCalledWith('/v1/webhooks/wh_1')
   })
 })
 
@@ -525,6 +616,64 @@ describe('ChannelsNamespace', () => {
 
     expect(mockHttp.put).toHaveBeenCalledWith('/v1/channels/ch_1', { enabled: false })
   })
+
+  it('email adds type to body', async () => {
+    mockHttp.post.mockResolvedValueOnce({ id: 'ch_1' })
+    await t.channels.email({ agent: 'responder', address: 'hi@acme.com' })
+
+    expect(mockHttp.post).toHaveBeenCalledWith('/v1/channels', expect.objectContaining({ type: 'email' }))
+  })
+
+  it('phone adds type to body', async () => {
+    mockHttp.post.mockResolvedValueOnce({ id: 'ch_1' })
+    await t.channels.phone({ agent: 'voice', phoneNumber: '+15550100' })
+
+    expect(mockHttp.post).toHaveBeenCalledWith('/v1/channels', expect.objectContaining({ type: 'phone' }))
+  })
+
+  it('enable calls PUT with enabled: true', async () => {
+    mockHttp.put.mockResolvedValueOnce({ id: 'ch_1', enabled: true })
+    await t.channels.enable('ch_1')
+
+    expect(mockHttp.put).toHaveBeenCalledWith('/v1/channels/ch_1', { enabled: true })
+  })
+
+  it('get calls GET /v1/channels/{id}', async () => {
+    mockHttp.get.mockResolvedValueOnce({ id: 'ch_1', type: 'chat_embed' })
+    await t.channels.get('ch_1')
+
+    expect(mockHttp.get).toHaveBeenCalledWith('/v1/channels/ch_1')
+  })
+
+  it('update calls PUT /v1/channels/{id}', async () => {
+    mockHttp.put.mockResolvedValueOnce({ id: 'ch_1' })
+    await t.channels.update('ch_1', { config: { theme: '#000' } })
+
+    expect(mockHttp.put).toHaveBeenCalledWith('/v1/channels/ch_1', { config: { theme: '#000' } })
+  })
+
+  it('delete calls DELETE /v1/channels/{id}', async () => {
+    mockHttp.delete.mockResolvedValueOnce(undefined)
+    await t.channels.delete('ch_1')
+
+    expect(mockHttp.delete).toHaveBeenCalledWith('/v1/channels/ch_1')
+  })
+
+  it('conversations unwraps { data: [...] }', async () => {
+    mockHttp.get.mockResolvedValueOnce({ data: [{ id: 'conv_1' }] })
+    const result = await t.channels.conversations('ch_1')
+
+    expect(mockHttp.get).toHaveBeenCalledWith('/v1/channels/ch_1/conversations')
+    expect(result).toEqual([{ id: 'conv_1' }])
+  })
+
+  it('test calls POST /v1/channels/{id}/test', async () => {
+    mockHttp.post.mockResolvedValueOnce({ ok: true, message: 'connected' })
+    const result = await t.channels.test('ch_1')
+
+    expect(mockHttp.post).toHaveBeenCalledWith('/v1/channels/ch_1/test')
+    expect(result.ok).toBe(true)
+  })
 })
 
 describe('MCPNamespace', () => {
@@ -560,6 +709,73 @@ describe('MCPNamespace', () => {
   it('serverUrl returns MCP endpoint', () => {
     expect(t.mcp.serverUrl()).toBe('https://mcp.theazo.com/v1')
   })
+
+  it('list unwraps { data: [...] }', async () => {
+    mockHttp.get.mockResolvedValueOnce({ data: [{ id: 'mcp_1' }] })
+    const result = await t.mcp.list()
+
+    expect(mockHttp.get).toHaveBeenCalledWith('/v1/mcp/connections')
+    expect(result).toEqual([{ id: 'mcp_1' }])
+  })
+
+  it('get calls GET /v1/mcp/connections/{id}', async () => {
+    mockHttp.get.mockResolvedValueOnce({ id: 'mcp_1', status: 'connected' })
+    await t.mcp.get('mcp_1')
+
+    expect(mockHttp.get).toHaveBeenCalledWith('/v1/mcp/connections/mcp_1')
+  })
+
+  it('refresh unwraps { data: [...] }', async () => {
+    mockHttp.post.mockResolvedValueOnce({ data: [{ name: 'tool1' }] })
+    const result = await t.mcp.refresh('mcp_1')
+
+    expect(mockHttp.post).toHaveBeenCalledWith('/v1/mcp/connections/mcp_1/refresh')
+    expect(result).toEqual([{ name: 'tool1' }])
+  })
+
+  it('update calls PUT /v1/mcp/connections/{id}', async () => {
+    mockHttp.put.mockResolvedValueOnce({ id: 'mcp_1' })
+    await t.mcp.update('mcp_1', { toolFilter: ['tool1'] })
+
+    expect(mockHttp.put).toHaveBeenCalledWith('/v1/mcp/connections/mcp_1', { toolFilter: ['tool1'] })
+  })
+
+  it('health calls GET /v1/mcp/connections/{id}/health', async () => {
+    mockHttp.get.mockResolvedValueOnce({ status: 'connected', latencyMs: 42 })
+    const result = await t.mcp.health('mcp_1')
+
+    expect(mockHttp.get).toHaveBeenCalledWith('/v1/mcp/connections/mcp_1/health')
+    expect(result.latencyMs).toBe(42)
+  })
+
+  it('disconnect calls DELETE /v1/mcp/connections/{id}', async () => {
+    mockHttp.delete.mockResolvedValueOnce(undefined)
+    await t.mcp.disconnect('mcp_1')
+
+    expect(mockHttp.delete).toHaveBeenCalledWith('/v1/mcp/connections/mcp_1')
+  })
+
+  it('deleteUserCredentials encodes userId in URL', async () => {
+    mockHttp.delete.mockResolvedValueOnce(undefined)
+    await t.mcp.deleteUserCredentials('mcp_1', 'user@test.com')
+
+    expect(mockHttp.delete).toHaveBeenCalledWith('/v1/mcp/connections/mcp_1/users/user%40test.com/credentials')
+  })
+
+  it('serverConfig calls PUT /v1/mcp/server/config', async () => {
+    mockHttp.put.mockResolvedValueOnce(undefined)
+    await t.mcp.serverConfig({ expose: ['tool1'], auth: 'api_key' })
+
+    expect(mockHttp.put).toHaveBeenCalledWith('/v1/mcp/server/config', { expose: ['tool1'], auth: 'api_key' })
+  })
+
+  it('getServerConfig calls GET /v1/mcp/server/config', async () => {
+    mockHttp.get.mockResolvedValueOnce({ expose: '*', auth: 'api_key', url: 'https://mcp.theazo.com/v1' })
+    const result = await t.mcp.getServerConfig()
+
+    expect(mockHttp.get).toHaveBeenCalledWith('/v1/mcp/server/config')
+    expect(result.url).toBe('https://mcp.theazo.com/v1')
+  })
 })
 
 describe('BillingNamespace', () => {
@@ -585,6 +801,47 @@ describe('BillingNamespace', () => {
     expect(mockHttp.post).toHaveBeenCalledWith('/v1/billing/budget', {
       monthly: { amount: 10000, currency: 'usd' },
     })
+  })
+
+  it('getSubscription calls GET /v1/billing/subscription', async () => {
+    mockHttp.get.mockResolvedValueOnce({ id: 'sub_1', plan: 'pro', status: 'active' })
+    const result = await t.billing.getSubscription()
+
+    expect(mockHttp.get).toHaveBeenCalledWith('/v1/billing/subscription')
+    expect(result?.plan).toBe('pro')
+  })
+
+  it('getPortalUrl calls GET /v1/billing/portal', async () => {
+    mockHttp.get.mockResolvedValueOnce({ url: 'https://billing.stripe.com/portal' })
+    const result = await t.billing.getPortalUrl()
+
+    expect(mockHttp.get).toHaveBeenCalledWith('/v1/billing/portal')
+    expect(result.url).toContain('stripe.com')
+  })
+
+  it('getBudget calls GET /v1/billing/budget', async () => {
+    mockHttp.get.mockResolvedValueOnce({ budget: { amount: 10000, currency: 'usd' }, spent: { amount: 500, currency: 'usd' } })
+    const result = await t.billing.getBudget()
+
+    expect(mockHttp.get).toHaveBeenCalledWith('/v1/billing/budget')
+    expect(result.spent.amount).toBe(500)
+  })
+
+  it('setUserBudget calls POST /v1/billing/user-budget', async () => {
+    mockHttp.post.mockResolvedValueOnce(undefined)
+    await t.billing.setUserBudget({ monthly: { amount: 5000, currency: 'usd' } })
+
+    expect(mockHttp.post).toHaveBeenCalledWith('/v1/billing/user-budget', {
+      monthly: { amount: 5000, currency: 'usd' },
+    })
+  })
+
+  it('getCreditBalance calls GET /v1/billing/credits', async () => {
+    mockHttp.get.mockResolvedValueOnce({ credits: 1500, currency: 'usd' })
+    const result = await t.billing.getCreditBalance()
+
+    expect(mockHttp.get).toHaveBeenCalledWith('/v1/billing/credits')
+    expect(result.credits).toBe(1500)
   })
 })
 
@@ -621,5 +878,99 @@ describe('FilesNamespace', () => {
     const result = await t.files.list({ userId: 'u1' })
 
     expect(result).toEqual([{ id: 'file_1' }])
+  })
+
+  it('get calls GET /v1/files/{id}', async () => {
+    mockHttp.get.mockResolvedValueOnce({ id: 'file_1', filename: 'test.txt' })
+    const result = await t.files.get('file_1')
+
+    expect(mockHttp.get).toHaveBeenCalledWith('/v1/files/file_1')
+    expect(result.filename).toBe('test.txt')
+  })
+
+  it('delete calls DELETE /v1/files/{id}', async () => {
+    mockHttp.delete.mockResolvedValueOnce(undefined)
+    await t.files.delete('file_1')
+
+    expect(mockHttp.delete).toHaveBeenCalledWith('/v1/files/file_1')
+  })
+})
+
+// ─── Previously missing namespaces ──────────────────────────────────
+
+describe('TriggersNamespace', () => {
+  const t = new Theazo({ apiKey: 'th_test' })
+
+  it('create calls POST /v1/triggers', async () => {
+    mockHttp.post.mockResolvedValueOnce({ id: 'trg_1', url: 'https://api.theazo.com/triggers/trg_1' })
+    await t.triggers.create({ name: 'payment', agent: 'classifier', userId: 'u1', type: 'webhook' })
+
+    expect(mockHttp.post).toHaveBeenCalledWith('/v1/triggers', expect.objectContaining({
+      name: 'payment',
+      type: 'webhook',
+    }))
+  })
+
+  it('list calls GET /v1/triggers', async () => {
+    mockHttp.get.mockResolvedValueOnce([{ id: 'trg_1' }])
+    const result = await t.triggers.list()
+
+    expect(mockHttp.get).toHaveBeenCalledWith('/v1/triggers')
+    expect(result).toEqual([{ id: 'trg_1' }])
+  })
+
+  it('delete calls DELETE /v1/triggers/{id}', async () => {
+    mockHttp.delete.mockResolvedValueOnce(undefined)
+    await t.triggers.delete('trg_1')
+
+    expect(mockHttp.delete).toHaveBeenCalledWith('/v1/triggers/trg_1')
+  })
+})
+
+describe('MetricsNamespace', () => {
+  const t = new Theazo({ apiKey: 'th_test' })
+
+  it('summary calls GET /v1/metrics/summary', async () => {
+    mockHttp.get.mockResolvedValueOnce({ activeAgents: 3, activeSessions: 5, errorRate: 0.02 })
+    const result = await t.metrics.summary()
+
+    expect(mockHttp.get).toHaveBeenCalledWith('/v1/metrics/summary')
+    expect(result.activeAgents).toBe(3)
+  })
+
+  it('query calls GET /v1/metrics with params', async () => {
+    mockHttp.get.mockResolvedValueOnce([{ timestamp: '2026-01-01', p50: 100, p95: 200, p99: 300 }])
+    await t.metrics.query({ metric: 'latency', since: '2026-01-01', until: '2026-01-07', interval: '1d' })
+
+    expect(mockHttp.get).toHaveBeenCalledWith('/v1/metrics', {
+      metric: 'latency',
+      since: '2026-01-01',
+      until: '2026-01-07',
+      interval: '1d',
+    })
+  })
+})
+
+describe('TracesNamespace', () => {
+  const t = new Theazo({ apiKey: 'th_test' })
+
+  it('list calls GET /v1/traces with filters', async () => {
+    mockHttp.get.mockResolvedValueOnce([{ traceId: 'tr_1', agentId: 'agt_1' }])
+    await t.traces.list({ agentId: 'agt_1', limit: 10 })
+
+    expect(mockHttp.get).toHaveBeenCalledWith('/v1/traces', {
+      agentId: 'agt_1',
+      sessionId: undefined,
+      limit: 10,
+      cursor: undefined,
+    })
+  })
+
+  it('get calls GET /v1/traces/{traceId}', async () => {
+    mockHttp.get.mockResolvedValueOnce({ traceId: 'tr_1', spans: [] })
+    const result = await t.traces.get('tr_1')
+
+    expect(mockHttp.get).toHaveBeenCalledWith('/v1/traces/tr_1')
+    expect(result.traceId).toBe('tr_1')
   })
 })

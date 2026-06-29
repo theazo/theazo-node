@@ -102,6 +102,39 @@ describe('Session', () => {
       expect(fleet.totalItems).toBe(5)
       expect(fleet.currentStatus).toBe('dispatching')
     })
+
+    it('FleetInstance.status calls GET /v1/fleets/{id}', async () => {
+      http.post.mockResolvedValueOnce({ id: 'flt_1', status: 'running', totalItems: 3 })
+      const fleet = await session.fleets.dispatch({ agent: 'a', inputs: [{}] })
+
+      http.get.mockResolvedValueOnce({ status: 'completed', total: 3, completed: 3, failed: 0, running: 0, pending: 0, cost: { amount: 50, currency: 'usd' } })
+      const status = await fleet.status()
+
+      expect(http.get).toHaveBeenCalledWith('/v1/fleets/flt_1')
+      expect(status.completed).toBe(3)
+    })
+
+    it('FleetInstance.results calls GET /v1/fleets/{id}/results', async () => {
+      http.post.mockResolvedValueOnce({ id: 'flt_1', status: 'completed', totalItems: 2 })
+      const fleet = await session.fleets.dispatch({ agent: 'a', inputs: [{}] })
+
+      http.get.mockResolvedValueOnce({ data: [{ itemIndex: 0, status: 'completed' }], hasMore: false, cursor: '' })
+      const results = await fleet.results({ status: 'completed', limit: 10 })
+
+      expect(http.get).toHaveBeenCalledWith('/v1/fleets/flt_1/results', { status: 'completed', limit: 10, cursor: undefined })
+      expect(results.data).toHaveLength(1)
+    })
+
+    it('FleetInstance.cancel calls POST /v1/fleets/{id}/cancel', async () => {
+      http.post.mockResolvedValueOnce({ id: 'flt_1', status: 'running', totalItems: 5 })
+      const fleet = await session.fleets.dispatch({ agent: 'a', inputs: [{}] })
+
+      http.post.mockResolvedValueOnce(undefined)
+      await fleet.cancel()
+
+      expect(http.post).toHaveBeenCalledWith('/v1/fleets/flt_1/cancel')
+      expect(fleet.currentStatus).toBe('cancelled')
+    })
   })
 
   describe('teams namespace', () => {
@@ -174,6 +207,37 @@ describe('Session', () => {
       expect(http.delete).toHaveBeenCalledWith(
         '/v1/knowledge/collections/my%20docs?userId=user_test'
       )
+    })
+
+    it('sync calls POST /v1/knowledge/sync', async () => {
+      http.post.mockResolvedValueOnce(undefined)
+      await session.knowledge.sync({
+        source: { type: 'notion', config: { databaseId: 'abc' } },
+        collection: 'wiki',
+        schedule: '0 */6 * * *',
+      })
+
+      expect(http.post).toHaveBeenCalledWith('/v1/knowledge/sync', {
+        userId: 'user_test',
+        source: { type: 'notion', config: { databaseId: 'abc' } },
+        collection: 'wiki',
+        syncSchedule: '0 */6 * * *',
+      })
+    })
+
+    it('sources unwraps { data: [...] }', async () => {
+      http.get.mockResolvedValueOnce({ data: [{ id: 'src_1', source: 'upload' }] })
+      const result = await session.knowledge.sources()
+
+      expect(http.get).toHaveBeenCalledWith('/v1/knowledge/sources', { userId: 'user_test' })
+      expect(result).toEqual([{ id: 'src_1', source: 'upload' }])
+    })
+
+    it('deleteSource encodes userId in URL', async () => {
+      http.delete.mockResolvedValueOnce(undefined)
+      await session.knowledge.deleteSource('src_1')
+
+      expect(http.delete).toHaveBeenCalledWith('/v1/knowledge/sources/src_1?userId=user_test')
     })
   })
 
@@ -291,6 +355,81 @@ describe('Session', () => {
         order: 'desc',
       })
     })
+
+    it('list calls GET /v1/sessions/{id}/chat with filters', async () => {
+      http.get.mockResolvedValueOnce({ data: [{ id: 'conv_1' }], hasMore: false })
+      await session.chat.list({ status: 'active', limit: 10 })
+
+      expect(http.get).toHaveBeenCalledWith('/v1/sessions/ses_test123/chat', {
+        status: 'active',
+        limit: 10,
+        cursor: undefined,
+      })
+    })
+
+    it('update calls PUT /v1/chat/{id}', async () => {
+      http.put.mockResolvedValueOnce({ id: 'conv_1', title: 'Updated' })
+      await session.chat.update('conv_1', { title: 'Updated' })
+
+      expect(http.put).toHaveBeenCalledWith('/v1/chat/conv_1', { title: 'Updated' })
+    })
+
+    it('unarchive calls POST /v1/chat/{id}/unarchive', async () => {
+      http.post.mockResolvedValueOnce(undefined)
+      await session.chat.unarchive('conv_1')
+
+      expect(http.post).toHaveBeenCalledWith('/v1/chat/conv_1/unarchive')
+    })
+
+    it('delete calls DELETE /v1/chat/{id}', async () => {
+      http.delete.mockResolvedValueOnce(undefined)
+      await session.chat.delete('conv_1')
+
+      expect(http.delete).toHaveBeenCalledWith('/v1/chat/conv_1')
+    })
+
+    it('context calls GET /v1/chat/{id}/context', async () => {
+      http.get.mockResolvedValueOnce({ totalMessages: 10, contextTokens: 500, strategy: 'sliding_window' })
+      const result = await session.chat.context('conv_1')
+
+      expect(http.get).toHaveBeenCalledWith('/v1/chat/conv_1/context')
+      expect(result.strategy).toBe('sliding_window')
+    })
+
+    it('injectContext calls POST /v1/chat/{id}/context', async () => {
+      http.post.mockResolvedValueOnce(undefined)
+      await session.chat.injectContext('conv_1', { content: 'User is on Pro plan', role: 'system' })
+
+      expect(http.post).toHaveBeenCalledWith('/v1/chat/conv_1/context', {
+        content: 'User is on Pro plan',
+        role: 'system',
+      })
+    })
+
+    it('createThread calls POST /v1/chat/{id}/threads', async () => {
+      http.post.mockResolvedValueOnce({ id: 'thread_1', parentMessageId: 'msg_1' })
+      await session.chat.createThread('conv_1', { parentMessageId: 'msg_1', title: 'Side thread' })
+
+      expect(http.post).toHaveBeenCalledWith('/v1/chat/conv_1/threads', {
+        parentMessageId: 'msg_1',
+        title: 'Side thread',
+      })
+    })
+
+    it('threads unwraps { data: [...] }', async () => {
+      http.get.mockResolvedValueOnce({ data: [{ id: 'thread_1' }] })
+      const result = await session.chat.threads('conv_1')
+
+      expect(http.get).toHaveBeenCalledWith('/v1/chat/conv_1/threads')
+      expect(result).toEqual([{ id: 'thread_1' }])
+    })
+
+    it('resolveHandoff calls POST /v1/chat/{id}/handoff/resolve', async () => {
+      http.post.mockResolvedValueOnce(undefined)
+      await session.chat.resolveHandoff('conv_1')
+
+      expect(http.post).toHaveBeenCalledWith('/v1/chat/conv_1/handoff/resolve')
+    })
   })
 
   describe('lifecycle methods', () => {
@@ -333,6 +472,14 @@ describe('Session', () => {
       await session.updateLimits({ maxAgents: 10 })
 
       expect(http.patch).toHaveBeenCalledWith('/v1/sessions/ses_test123/limits', { maxAgents: 10 })
+    })
+
+    it('limits calls GET /v1/sessions/{id}/limits', async () => {
+      http.get.mockResolvedValueOnce({ maxCost: { limit: 500, used: 50, remaining: 450, percentage: 10 } })
+      const result = await session.limits()
+
+      expect(http.get).toHaveBeenCalledWith('/v1/sessions/ses_test123/limits')
+      expect(result.maxCost?.percentage).toBe(10)
     })
   })
 })
