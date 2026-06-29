@@ -1,0 +1,13 @@
+{
+  "name": "theazo-example-full-app",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "npx tsx server.ts",
+    "build": "echo 'no build step'"
+  },
+  "dependencies": {
+    "theazo": "workspace:*"
+  }
+}

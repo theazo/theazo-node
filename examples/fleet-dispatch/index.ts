@@ -32,7 +32,7 @@ async function main() {
 
   // Stream results as they complete
   for await (const item of fleet.stream()) {
-    console.log(`Done: ${item.input.company} — $${(item.cost / 100).toFixed(2)}`)
+    console.log(`Done: ${item.input.company} — $${(item.cost.amount / 100).toFixed(2)}`)
   }
 }
 

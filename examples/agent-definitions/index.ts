@@ -16,6 +16,7 @@ async function main() {
   // Create a reusable agent definition
   const def = await theazo.agents.define({
     name: 'researcher',
+    description: 'Research agent that searches the web and summarizes findings',
     compute: 'python',
     model: 'anthropic/claude-sonnet',
     instructions: 'You are a research agent. Use web search to find data, then write a summary.',

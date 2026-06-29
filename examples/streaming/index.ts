@@ -26,8 +26,8 @@ async function main() {
       process.stdout.write(event.text) // tokens arrive one by one
     }
     if (event.type === 'done') {
-      console.log(`\n\nTokens: ${event.usage.input}in / ${event.usage.output}out`)
-      console.log(`Cost: $${(event.cost / 100).toFixed(2)}`)
+      console.log(`\n\nTokens: ${event.tokenCount}`)
+      console.log(`Cost: $${(event.cost.amount / 100).toFixed(2)}`)
     }
   }
 }

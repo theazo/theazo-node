@@ -19,17 +19,15 @@ async function main() {
     name: 'github',
     transport: 'sse',
     url: 'https://mcp-github.example.com/sse',
-    credentials: 'platform', // or 'per_user' for user-specific auth
+    credentialsType: 'platform', // or 'per_user' for user-specific auth
   })
   console.log('Connected:', connection.id)
-  console.log('Tools discovered:', connection.tools.map(t => t.name))
+  console.log('Tools discovered:', connection.discoveredTools.map((t: { name: string }) => t.name))
   // → ['github_create_issue', 'github_search_repos', 'github_get_file']
 
   // Agent automatically discovers and uses MCP tools
   const session = await theazo.sessions.forUser('mcp_user')
-  const result = await session.run('developer', 'Find open issues labeled "bug" in our repo', {
-    mcp: [connection.id], // attach MCP servers to this agent run
-  })
+  const result = await session.run('developer', 'Find open issues labeled "bug" in our repo')
 
   console.log('Output:', result.output)
   // The agent called github_search_repos and github_list_issues automatically

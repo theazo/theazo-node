@@ -57,15 +57,13 @@ async function main() {
     .step('fetch', { agent: 'ticket-fetcher' })
     .map('classify-all', {
       over: '$.fetch.output.tickets',
-      step: { type: 'agent', agent: 'classifier' },
+      agent: 'classifier',
       concurrency: 5,
       onItemFailure: 'skip',
     })
     .transform('summarize', {
-      expression: {
-        total: '$.classify-all.output.length',
-        results: '$.classify-all.output',
-      },
+      total: '$.classify-all.output.length',
+      results: '$.classify-all.output',
     })
     .build()
 
@@ -84,7 +82,7 @@ async function main() {
       maxTotalCost: { amount: 500, currency: 'usd' },
     })
     .step('extract', { agent: 'extractor', input: { url: '$.trigger.url' } })
-    .approval('review', { timeout: '24h' })
+    .approval('review', 'human_review', { timeout: '24h' })
     .step('process', { agent: 'processor', input: { data: '$.extract.output' } })
     .build()
 
@@ -93,9 +91,7 @@ async function main() {
   const wf = await theazo.workflows.create(simple)
   console.log('Workflow:', wf.id)
 
-  const stream = theazo.workflows.streamRun(wf.id, {
-    input: { topic: 'AI agent infrastructure' },
-  })
+  const stream = theazo.workflows.streamRun(wf.id)
 
   for await (const event of stream) {
     switch (event.event) {
@@ -103,13 +99,13 @@ async function main() {
         console.log(`▶ Step "${event.stepId}" started`)
         break
       case 'step.completed':
-        console.log(`✓ Step "${event.stepId}" done — $${(event.cost / 100).toFixed(2)}`)
+        console.log(`✓ Step "${event.stepId}" done — cost: ${event.cost}`)
         break
       case 'step.failed':
         console.log(`✗ Step "${event.stepId}" failed: ${event.error}`)
         break
       case 'run.completed':
-        console.log(`\nDone — total: $${(event.totalCost / 100).toFixed(2)}`)
+        console.log(`\nDone — total cost: ${event.totalCost}`)
         console.log('Output:', event.output)
         break
     }
