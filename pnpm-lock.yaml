@@ -117,6 +117,12 @@ importers:
         specifier: ^4.15.0
         version: 4.22.3
 
+  examples/long-running:
+    dependencies:
+      theazo:
+        specifier: workspace:*
+        version: link:../../packages/theazo
+
   examples/mcp-tools:
     dependencies:
       theazo:
@@ -126,6 +132,12 @@ importers:
       tsx:
         specifier: ^4.15.0
         version: 4.22.3
+
+  examples/multi-tenant:
+    dependencies:
+      theazo:
+        specifier: workspace:*
+        version: link:../../packages/theazo
 
   examples/scheduling:
     dependencies:
@@ -146,6 +158,12 @@ importers:
       tsx:
         specifier: ^4.15.0
         version: 4.22.3
+
+  examples/teams:
+    dependencies:
+      theazo:
+        specifier: workspace:*
+        version: link:../../packages/theazo
 
   examples/workflows:
     dependencies:
