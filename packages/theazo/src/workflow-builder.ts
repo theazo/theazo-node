@@ -160,6 +160,23 @@ export class WorkflowBuilder {
     return this
   }
 
+  wait(id: string, opts: {
+    event: string
+    timeout?: string
+    onTimeout?: string
+    dependsOn?: string[]
+  }): this {
+    this.steps.push({
+      id,
+      type: 'wait',
+      event: opts.event,
+      timeout: opts.timeout,
+      onTimeout: opts.onTimeout,
+      dependsOn: opts.dependsOn ?? (this.steps.length > 0 ? [this.steps[this.steps.length - 1].id] : undefined),
+    })
+    return this
+  }
+
   approval(id: string, action: string, opts?: { timeout?: string; defaultAction?: 'approve' | 'deny'; dependsOn?: string[] }): this {
     this.steps.push({
       id,

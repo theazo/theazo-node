@@ -429,6 +429,13 @@ export interface WorkflowPlannerStep extends WorkflowStepBase {
   maxSpawnedCost?: Cost
 }
 
+export interface WorkflowWaitStep extends WorkflowStepBase {
+  type: 'wait'
+  event: string
+  timeout?: string
+  onTimeout?: string
+}
+
 export type WorkflowStep =
   | WorkflowAgentStep
   | WorkflowParallelStep
@@ -439,6 +446,7 @@ export type WorkflowStep =
   | WorkflowTransformStep
   | WorkflowMapStep
   | WorkflowPlannerStep
+  | WorkflowWaitStep
 
 export interface WorkflowPolicy {
   allowTools?: string[]

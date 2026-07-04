@@ -206,6 +206,11 @@ class WorkflowsNamespace {
     await this.http.post(`/v1/workflow-runs/${runId}/retry`)
   }
 
+  /** Resume a run paused on a `wait` step by delivering the awaited event. */
+  async resumeRun(runId: string, opts: { event: string; payload?: Record<string, unknown> }): Promise<void> {
+    await this.http.post(`/v1/workflow-runs/${runId}/resume`, opts)
+  }
+
   async *streamRun(runId: string): AsyncIterable<import('./types.js').WorkflowStreamEvent> {
     yield* this.http.stream<import('./types.js').WorkflowStreamEvent>(`/v1/workflow-runs/${runId}/stream`)
   }
