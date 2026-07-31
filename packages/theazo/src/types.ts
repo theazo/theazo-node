@@ -427,6 +427,7 @@ export interface WorkflowPlannerStep extends WorkflowStepBase {
   allowedStepTypes?: string[]
   requireApproval?: boolean
   maxSpawnedCost?: Cost
+  requireApprovalAfterSteps?: number
 }
 
 export interface WorkflowWaitStep extends WorkflowStepBase {
@@ -567,24 +568,51 @@ export interface Fleet {
   totalItems: number
 }
 
-export interface FleetStatus {
-  status: string
-  total: number
+export interface FleetProgress {
   completed: number
   failed: number
-  running: number
   pending: number
-  cost: Cost
+  running: number
+  total: number
 }
 
-export interface FleetItemResult {
-  itemIndex: number
-  input: Record<string, unknown>
-  output: string
-  cost: Cost
-  duration: string
-  status: 'completed' | 'failed' | 'pending' | 'running'
+// GET /v1/fleets/:id — the job fields plus a progress breakdown (matches the wire).
+export interface FleetStatus {
+  id: string
+  status: string
+  totalItems: number
+  completedItems: number
+  failedItems: number
+  totalCost: number  // cents
+  progress: FleetProgress
+  agent?: string | null            // agent definition the fleet runs
+  concurrency?: number             // max items run in parallel
+  createdAt?: string               // ISO dispatch timestamp
+  completedAt?: string | null      // ISO completion timestamp, or null while running
 }
+
+// GET /v1/fleets/:id/results — one entry per dispatched input (the stored item).
+export interface FleetItemResult {
+  id: string
+  agentId: string | null
+  input: Record<string, unknown>
+  output?: Record<string, unknown>
+  status: 'pending' | 'running' | 'completed' | 'failed'
+  cost: number  // cents
+  duration?: number  // ms
+  error?: { message: string; code?: string }
+}
+
+// GET /v1/fleets/:id/stream — SSE events; discriminate on `event`.
+export type FleetStreamEvent =
+  | { event: 'connected'; fleetId: string; status: string; totalItems: number }
+  | { event: 'fleet.progress'; completed: number; failed: number; total: number }
+  | { event: 'item.completed'; itemId: string; cost: number }
+  | { event: 'item.failed'; itemId: string; error: string }
+  | { event: 'fleet.paused'; reason: string }
+  | { event: 'fleet.completed'; totalCost: number; completedItems: number; failedItems: number }
+  | { event: 'fleet.cancelled' }
+  | { event: 'heartbeat'; t: number }
 
 export interface FleetResultsFilters extends PaginationParams {
   status?: string
@@ -592,18 +620,20 @@ export interface FleetResultsFilters extends PaginationParams {
 
 // ─── Teams ──────────────────────────────────────────────────────────
 
+// Shapes mirror @theazo/contracts (TeamMember / TeamCreateOpts). Hand-authored to
+// keep the published SDK dependency-free; conformance-checked in contract-check/.
 export interface TeamAgentConfig {
   role: string
   agent: string
-  instructions: string
+  instructions?: string
 }
 
 export type CoordinationMode = 'sequential' | 'collaborative' | 'hierarchical'
 
 export interface TeamCreateOpts {
-  name: string
+  name?: string
   agents: TeamAgentConfig[]
-  coordination: CoordinationMode
+  coordination?: CoordinationMode
   sharedContext?: boolean
   maxRounds?: number
 }
@@ -615,6 +645,7 @@ export interface Team {
   coordination: CoordinationMode
 }
 
+// Client transform of a completed TeamRun (built by TeamInstance.run()).
 export interface TeamResult {
   output: string
   agentOutputs: Record<string, string>
@@ -622,18 +653,36 @@ export interface TeamResult {
   duration: string
 }
 
+// Wire response for GET /v1/team-runs/:runId (conforms to @theazo/contracts).
+export interface TeamRun {
+  id: string
+  teamId: string
+  task: string
+  status: 'running' | 'completed' | 'failed' | 'cancelled'
+  agentOutputs: Record<string, string>
+  messages: Record<string, unknown>[]
+  output: string | null
+  totalCost: string // numeric string of cents
+  startedAt: string | null // ISO
+  completedAt: string | null // ISO
+}
+
 // ─── Approvals ──────────────────────────────────────────────────────
 
 export interface Approval {
   id: string // 'apr_1'
   agentId: string
+  sessionId: string
   action: string
   params: Record<string, unknown>
   status: 'pending' | 'approved' | 'denied' | 'expired'
-  requestedAt: string
-  expiresAt: string
-  resolvedAt?: string
-  resolvedBy?: string
+  timeout: string // e.g. '24h'
+  requestedAt: string // ISO
+  decidedAt: string | null // ISO, null while pending
+  expiresAt: string // ISO
+  modifications?: Record<string, unknown> // approved-with-changes
+  reason?: string // present when denied
+  decidedBy?: string
 }
 
 export interface ApprovalListFilters {
@@ -641,12 +690,16 @@ export interface ApprovalListFilters {
   status?: 'pending' | 'approved' | 'denied' | 'expired'
 }
 
+// Mirror @theazo/contracts (approve/denyOptsSchema); conformance-checked.
+// `decidedBy` was missing here though the API + engine accept and record it.
 export interface ApproveOpts {
   modifications?: Record<string, unknown>
+  decidedBy?: string
 }
 
 export interface DenyOpts {
   reason?: string
+  decidedBy?: string
 }
 
 // ─── Knowledge ──────────────────────────────────────────────────────
@@ -674,6 +727,15 @@ export interface KnowledgeSyncOpts {
 export interface KnowledgeQueryOpts {
   collection?: string
   topK?: number
+  threshold?: number  // Min cosine similarity (0-1); results below are dropped. Default 0.
+}
+
+export interface KnowledgeChunkMetadata {
+  filename?: string
+  page?: number
+  section?: string
+  url?: string
+  contentHash?: string
 }
 
 export interface KnowledgeResult {
@@ -681,6 +743,7 @@ export interface KnowledgeResult {
   score: number
   source: string
   chunk: number
+  metadata: KnowledgeChunkMetadata
 }
 
 export interface KnowledgeStats {
@@ -702,10 +765,11 @@ export interface KnowledgeSourceData {
 
 // ─── Schedules & Triggers ───────────────────────────────────────────
 
+// Mirrors @theazo/contracts (scheduleCreateOptsSchema); conformance-checked.
 export interface ScheduleCreateOpts {
-  name: string
-  agent: string
+  agent?: string
   userId: string
+  name?: string
   cron: string
   timezone?: string
   input?: Record<string, unknown>
@@ -713,38 +777,68 @@ export interface ScheduleCreateOpts {
 
 export interface Schedule {
   id: string // 'sch_abc'
-  name: string
-  agent: string
+  agent: string | null
   userId: string
+  name: string | null
   cron: string
   timezone: string
-  status: 'active' | 'paused'
-  createdAt: string
+  input: Record<string, unknown> | null
+  enabled: boolean
+  lastRunAt: string | null // ISO
+  nextRunAt: string | null // ISO
+  createdAt: string // ISO
 }
 
 export interface ScheduleExecution {
-  executionId: string
+  id: string
+  scheduleId: string
   agentId: string
-  status: string
+  sessionId: string
+  status: 'running' | 'completed' | 'failed'
   cost: Cost
-  startedAt: string
-  completedAt: string | null
+  startedAt: string // ISO
+  completedAt: string | null // ISO
 }
 
-export interface TriggerCreateOpts {
-  name: string
-  agent: string
+// Mirrors @theazo/contracts (triggerCreateOptsSchema); conformance-checked.
+// Both kinds are creatable: `webhook` returns a signed URL; `event` subscribes to
+// an application event emitted via `events.emit()` and fires on a name+filter match.
+export interface WebhookTriggerCreateOpts {
+  agent?: string
   userId: string
+  name?: string
   type: 'webhook'
+}
+
+export interface EventTriggerCreateOpts {
+  agent?: string
+  userId: string
+  name?: string
+  type: 'event'
+  event: string
+  filter?: Record<string, unknown>
+}
+
+export type TriggerCreateOpts = WebhookTriggerCreateOpts | EventTriggerCreateOpts
+
+// POST /v1/events body — mirrors @theazo/contracts (eventEmitSchema).
+export interface EventEmitOpts {
+  event: string
+  userId?: string
+  payload?: Record<string, unknown>
 }
 
 export interface Trigger {
   id: string // 'trg_abc'
-  name: string
-  url: string
-  secret: string
-  agent: string
+  agent: string | null
   userId: string
+  name: string | null
+  type: 'webhook' | 'event'
+  url: string | null
+  secret: string | null // returned once on create; null on reads
+  enabled: boolean
+  lastFiredAt: string | null // ISO
+  createdAt: string // ISO
 }
 
 // ─── Tools ──────────────────────────────────────────────────────────
@@ -756,22 +850,31 @@ export interface ToolRegisterOpts {
   handler: {
     type: 'webhook'
     url: string
+    headers?: Record<string, string>
+    timeout?: number
   }
   requiresApproval?: boolean
 }
 
 export interface Tool {
+  id: string
   name: string
   description: string
+  parameters: Record<string, unknown>
+  handler: { type: 'webhook'; url: string; headers?: Record<string, string>; timeout?: number }
   builtin: boolean
-  parameters?: Record<string, unknown>
-  handler?: { type: string; url: string }
   requiresApproval: boolean
+  signingSecret?: string // returned once on register, omitted on reads
+  createdAt: string // ISO
+  updatedAt: string // ISO
 }
 
 export interface ToolResult {
-  output: unknown
-  success: boolean
+  tool: string
+  input: Record<string, unknown>
+  output: string
+  error?: string
+  duration: number // ms
 }
 
 // ─── Tasks ──────────────────────────────────────────────────────────
@@ -784,16 +887,22 @@ export interface TaskSubmitOpts {
 }
 
 export interface Task {
-  taskId: string // 'task_abc'
+  id: string // 'task_abc'
+  sessionId: string
   status: 'queued' | 'running' | 'completed' | 'failed' | 'cancelled'
-  progress?: number
-  message?: string
-  output?: string
-  cost?: Cost
+  progress: number | null
+  progressMessage: string | null
+  output: string | null
+  cost: Cost
+  priority: 'low' | 'normal' | 'high'
+  error: string | null
+  queuedAt: string | null
+  startedAt: string | null
+  completedAt: string | null
 }
 
 export interface TaskListFilters {
-  status?: string
+  status?: 'queued' | 'running' | 'completed' | 'failed' | 'cancelled'
 }
 
 export interface TaskWaitOpts {
@@ -996,14 +1105,19 @@ export interface Webhook {
 
 export interface GuardrailViolation {
   id: string
-  agentId: string
-  type: string
-  message: string
-  timestamp: string
+  agentId: string | null
+  sessionId: string | null
+  type: 'pii_detected' | 'content_blocked' | 'injection_detected' | 'domain_blocked' | 'tool_limit'
+  severity: 'low' | 'medium' | 'high' | 'critical'
+  action: 'redacted' | 'blocked' | 'warned' | 'logged'
+  details: Record<string, unknown> | null
+  createdAt: string
 }
 
 export interface GuardrailViolationFilters {
-  period?: string
+  type?: 'pii_detected' | 'content_blocked' | 'injection_detected' | 'domain_blocked' | 'tool_limit'
+  severity?: 'low' | 'medium' | 'high' | 'critical'
+  limit?: number
 }
 
 // ─── API Keys ───────────────────────────────────────────────────────
@@ -1119,7 +1233,7 @@ export interface ChatSearchOpts {
   limit?: number
 }
 
-export type ChatConversationStatus = 'active' | 'archived' | 'handed_off'
+export type ChatConversationStatus = 'active' | 'archived'
 export type ChatMessageRole = 'user' | 'assistant' | 'system' | 'tool'
 
 export interface ChatConversation {
@@ -1138,7 +1252,6 @@ export interface ChatMessage {
   role: ChatMessageRole
   content: string | null
   toolCalls: Array<{ name: string; input: Record<string, unknown>; output?: string }> | null
-  attachments: string[]
   cost: Cost
   tokenCount: number | null
   createdAt: string
@@ -1221,6 +1334,7 @@ export interface MCPConnection {
   error: string | null
   createdAt: string
   updatedAt: string
+  authUrl?: string                        // OAuth2 redirect URL — connect response, oauth2 only
 }
 
 export interface MCPTool {
@@ -1263,7 +1377,7 @@ export type ChannelType = 'chat_embed' | 'slack' | 'email' | 'phone'
 
 export interface Channel {
   id: string
-  agentDefinitionId: string
+  agent: string
   type: ChannelType
   config: Record<string, unknown>
   enabled: boolean
@@ -1273,6 +1387,9 @@ export interface Channel {
   scriptTag?: string // Only for chat_embed
 }
 
+// Create opts mirror @theazo/contracts (chatEmbed/slack/email/phone CreateOpts +
+// channelUpdateOpts); hand-authored to keep the published SDK dependency-free,
+// conformance-checked in contract-check/channels.contract.ts.
 export interface ChatEmbedCreateOpts {
   agent: string
   theme: {
@@ -1313,5 +1430,5 @@ export interface ChannelConversation {
   agentId: string
   messageCount: number
   startedAt: string
-  lastMessageAt: string
+  lastMessageAt: string | null
 }

@@ -9,6 +9,7 @@ import type {
   Fleet,
   FleetStatus,
   FleetItemResult,
+  FleetStreamEvent,
   FleetResultsFilters,
   KnowledgeUploadOpts,
   KnowledgeUploadFile,
@@ -31,6 +32,7 @@ import type {
   Team,
   TeamCreateOpts,
   TeamResult,
+  TeamRun,
   UsageReport,
   ChatCreateOpts,
   ChatSendOpts,
@@ -138,8 +140,8 @@ export class FleetInstance {
     })
   }
 
-  async *stream(): AsyncIterable<FleetItemResult> {
-    yield* this.http.stream<FleetItemResult>(`/v1/fleets/${this.id}/stream`)
+  async *stream(): AsyncIterable<FleetStreamEvent> {
+    yield* this.http.stream<FleetStreamEvent>(`/v1/fleets/${this.id}/stream`)
   }
 
   async cancel(): Promise<void> {
@@ -176,14 +178,7 @@ export class TeamInstance {
 
     while (Date.now() - start < maxPollTime) {
       await new Promise(r => setTimeout(r, pollInterval))
-      const run = await this.http.get<{
-        status: string
-        output?: string | null
-        agentOutputs?: Record<string, string> | null
-        totalCost?: string | null
-        startedAt?: string | null
-        completedAt?: string | null
-      }>(`/v1/team-runs/${runId}`)
+      const run = await this.http.get<TeamRun>(`/v1/team-runs/${runId}`)
 
       if (run.status === 'completed' || run.status === 'failed' || run.status === 'cancelled') {
         const startMs = run.startedAt ? new Date(run.startedAt).getTime() : start
@@ -321,6 +316,7 @@ export class Session {
         query: q,
         collection: opts?.collection,
         topK: opts?.topK,
+        threshold: opts?.threshold,
       })
       return result.data
     },
@@ -345,8 +341,10 @@ export class Session {
     submit: async (opts: TaskSubmitOpts): Promise<Task> => {
       return this.http.post<Task>(`/v1/sessions/${this.id}/tasks`, opts)
     },
+    // get/wait/cancel are keyed by the globally-unique task id (no session prefix),
+    // matching the routes; submit + list stay session-scoped.
     get: async (id: string): Promise<Task> => {
-      return this.http.get<Task>(`/v1/sessions/${this.id}/tasks/${id}`)
+      return this.http.get<Task>(`/v1/tasks/${id}`)
     },
     list: async (filters?: TaskListFilters): Promise<Task[]> => {
       return this.http.get<Task[]>(`/v1/sessions/${this.id}/tasks`, {
@@ -354,12 +352,12 @@ export class Session {
       })
     },
     wait: async (id: string, opts?: TaskWaitOpts): Promise<Task> => {
-      return this.http.get<Task>(`/v1/sessions/${this.id}/tasks/${id}/wait`, {
+      return this.http.get<Task>(`/v1/tasks/${id}/wait`, {
         timeout: opts?.timeout,
       })
     },
     cancel: async (id: string): Promise<void> => {
-      await this.http.post(`/v1/sessions/${this.id}/tasks/${id}/cancel`)
+      await this.http.post(`/v1/tasks/${id}/cancel`)
     },
   }
 

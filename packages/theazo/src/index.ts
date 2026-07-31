@@ -44,6 +44,8 @@ import type {
   TraceListFilters,
   Trigger,
   TriggerCreateOpts,
+  EventTriggerCreateOpts,
+  EventEmitOpts,
   UsageExportOpts,
   UsageSummary,
   UsageSummaryOpts,
@@ -290,12 +292,29 @@ class TriggersNamespace {
     return this.http.post<Trigger>('/v1/triggers', opts)
   }
 
+  // Subscribe an agent to an application event. Fires when `events.emit(event, …)`
+  // is called with a matching name and the (optional) filter passes.
+  async on(event: string, opts: Omit<EventTriggerCreateOpts, 'type' | 'event'>): Promise<Trigger> {
+    return this.http.post<Trigger>('/v1/triggers', { ...opts, type: 'event', event })
+  }
+
   async list(): Promise<Trigger[]> {
     return this.http.get<Trigger[]>('/v1/triggers')
   }
 
   async delete(id: string): Promise<void> {
     await this.http.delete(`/v1/triggers/${id}`)
+  }
+}
+
+class EventsNamespace {
+  constructor(private http: HttpClient) {}
+
+  // Emit an application event. Every matching enabled `event` trigger fires
+  // asynchronously (agents run off the request path). Scope to one end user with
+  // `userId`, or omit to fan out to every matching trigger on the platform.
+  async emit(event: string, opts: Omit<EventEmitOpts, 'event'> = {}): Promise<void> {
+    await this.http.post('/v1/events', { event, ...opts })
   }
 }
 
@@ -426,7 +445,9 @@ class GuardrailsNamespace {
 
   async violations(filters?: GuardrailViolationFilters): Promise<GuardrailViolation[]> {
     const result = await this.http.get<{ data: GuardrailViolation[] } | GuardrailViolation[]>('/v1/guardrails/violations', {
-      period: filters?.period,
+      type: filters?.type,
+      severity: filters?.severity,
+      limit: filters?.limit,
     })
     return Array.isArray(result) ? result : (result.data ?? [])
   }
@@ -649,6 +670,7 @@ export class Theazo {
   readonly approvals: ApprovalsNamespace
   readonly schedules: SchedulesNamespace
   readonly triggers: TriggersNamespace
+  readonly events: EventsNamespace
   readonly tools: ToolsNamespace
   readonly logs: LogsNamespace
   readonly metrics: MetricsNamespace
@@ -677,6 +699,7 @@ export class Theazo {
     this.approvals = new ApprovalsNamespace(this.http)
     this.schedules = new SchedulesNamespace(this.http)
     this.triggers = new TriggersNamespace(this.http)
+    this.events = new EventsNamespace(this.http)
     this.tools = new ToolsNamespace(this.http)
     this.logs = new LogsNamespace(this.http)
     this.metrics = new MetricsNamespace(this.http)

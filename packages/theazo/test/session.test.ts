@@ -252,20 +252,20 @@ describe('Session', () => {
       })
     })
 
-    it('wait calls GET /v1/sessions/{id}/tasks/{taskId}/wait', async () => {
+    it('wait calls GET /v1/tasks/{taskId}/wait (globally-unique task id, no session prefix)', async () => {
       http.get.mockResolvedValueOnce({ taskId: 'task_1', status: 'completed' })
       await session.tasks.wait('task_1', { timeout: '30s' })
 
-      expect(http.get).toHaveBeenCalledWith('/v1/sessions/ses_test123/tasks/task_1/wait', {
+      expect(http.get).toHaveBeenCalledWith('/v1/tasks/task_1/wait', {
         timeout: '30s',
       })
     })
 
-    it('cancel calls POST /v1/sessions/{id}/tasks/{taskId}/cancel', async () => {
+    it('cancel calls POST /v1/tasks/{taskId}/cancel (globally-unique task id, no session prefix)', async () => {
       http.post.mockResolvedValueOnce(undefined)
       await session.tasks.cancel('task_1')
 
-      expect(http.post).toHaveBeenCalledWith('/v1/sessions/ses_test123/tasks/task_1/cancel')
+      expect(http.post).toHaveBeenCalledWith('/v1/tasks/task_1/cancel')
     })
   })
 
