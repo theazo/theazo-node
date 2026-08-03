@@ -125,8 +125,8 @@ export interface AgentCreateOpts {
   browser?: boolean
   storage?: string
   gpu?: string
-  /** Model ID string ('anthropic/claude-sonnet') or per-agent BYOI config. */
-  model?: string | AgentModelConfig
+  /** Model ID string, e.g. 'anthropic/claude-sonnet'. */
+  model?: string
   instructions?: string
   tools?: string[]
   timeout?: string
@@ -140,8 +140,10 @@ export interface AgentCreateOpts {
   guardrails?: GuardrailConfig
   lifecycle?: LifecycleConfig
   definition?: string
-  overrides?: Partial<AgentCreateOpts>
+  overrides?: Record<string, unknown>
   secrets?: string[]
+  /** MCP connection IDs or names to attach, or '*' for all. */
+  mcp?: string[] | '*'
 }
 
 export interface AgentRunOpts {
@@ -310,10 +312,10 @@ export interface FileListFilters {
 
 export interface AgentDefinitionOpts {
   name: string
-  description: string
-  compute: ComputeRuntime
-  model: string
-  instructions: string
+  description?: string
+  compute?: ComputeRuntime
+  model?: string
+  systemPrompt?: string
   tools?: string[]
   browser?: boolean
   timeout?: string
@@ -327,7 +329,7 @@ export interface AgentDefinition {
   description: string
   compute: ComputeRuntime
   model: string
-  instructions: string
+  systemPrompt: string
   tools: string[]
   browser: boolean
   timeout: string
@@ -336,9 +338,12 @@ export interface AgentDefinition {
 }
 
 export interface AgentDefinitionUpdate {
-  instructions?: string
+  systemPrompt?: string
   tools?: string[]
   model?: string
+  compute?: ComputeRuntime
+  browser?: boolean
+  timeout?: string
   config?: { temperature?: number; maxTokens?: number }
   changelog?: string
 }
@@ -466,7 +471,7 @@ export interface RetryConfig {
 }
 
 export interface WorkflowCreateOpts {
-  name: string
+  name?: string
   description?: string
   steps: WorkflowStep[]
   inputSchema?: Record<string, unknown>
@@ -475,6 +480,8 @@ export interface WorkflowCreateOpts {
   onFailure?: 'pause' | 'retry' | 'skip' | 'abort'
   retries?: RetryConfig
   timeout?: string
+  concurrency?: number
+  plannerPolicy?: Record<string, unknown>
 }
 
 export interface Workflow {
@@ -523,6 +530,11 @@ export interface WorkflowRunOpts {
   sessionId: string
   input?: Record<string, unknown>
   idempotencyKey?: string
+}
+
+export interface WorkflowResumeOpts {
+  event: string
+  payload?: Record<string, unknown>
 }
 
 export interface WorkflowRunFilters extends PaginationParams {
@@ -875,6 +887,128 @@ export interface ToolResult {
   output: string
   error?: string
   duration: number // ms
+}
+
+// ─── Agent Customizations (§3.17) ───────────────────────────────────
+// Four distinct primitives that attach to Agent Store blueprints. Hand-authored to
+// mirror @theazo/contracts; the Equal<> guards in contract-check/customizations
+// fail `pnpm lint` on any drift.
+
+export type CustomizationKind = 'instruction' | 'prompt' | 'skill' | 'hook'
+
+export interface PromptVariable {
+  name: string
+  description?: string
+  required?: boolean
+  default?: string
+}
+
+export type HookEvent =
+  | 'session_start' | 'user_prompt' | 'pre_tool_use' | 'post_tool_use'
+  | 'pre_compact' | 'subagent_start' | 'subagent_stop' | 'stop'
+
+export type HookAction =
+  | { type: 'block'; reason: string }
+  | { type: 'ask'; reason: string }
+  | { type: 'inject_context'; message: string }
+
+export interface Instruction {
+  id: string
+  name: string
+  description?: string
+  enabled: boolean
+  createdAt: string
+  updatedAt: string
+  kind: 'instruction'
+  body: string
+  priority: number
+}
+
+export interface Prompt {
+  id: string
+  name: string
+  description?: string
+  enabled: boolean
+  createdAt: string
+  updatedAt: string
+  kind: 'prompt'
+  template: string
+  variables: PromptVariable[]
+}
+
+export interface Skill {
+  id: string
+  name: string
+  enabled: boolean
+  createdAt: string
+  updatedAt: string
+  kind: 'skill'
+  description: string // required — the runtime gate
+  instructions: string
+  toolIds: string[]
+}
+
+export interface Hook {
+  id: string
+  name: string
+  description?: string
+  enabled: boolean
+  createdAt: string
+  updatedAt: string
+  kind: 'hook'
+  event: HookEvent
+  action: HookAction
+}
+
+export type Customization = Instruction | Prompt | Skill | Hook
+
+export interface InstructionCreate {
+  name: string
+  description?: string
+  enabled?: boolean
+  body: string
+  priority?: number
+}
+
+export interface PromptCreate {
+  name: string
+  description?: string
+  enabled?: boolean
+  template: string
+  variables?: PromptVariable[]
+}
+
+export interface SkillCreate {
+  name: string
+  description: string
+  enabled?: boolean
+  instructions: string
+  toolIds?: string[]
+}
+
+export interface HookCreate {
+  name: string
+  description?: string
+  enabled?: boolean
+  event: HookEvent
+  action: HookAction
+}
+
+export interface PromptRenderResult {
+  text: string
+}
+
+export interface Attachment {
+  id: string
+  agentDefinitionId: string
+  customizationId: string
+  kind: CustomizationKind
+  order: number
+}
+
+export interface AttachOpts {
+  customizationId: string
+  order?: number
 }
 
 // ─── Tasks ──────────────────────────────────────────────────────────

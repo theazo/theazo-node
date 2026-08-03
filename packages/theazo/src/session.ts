@@ -79,7 +79,7 @@ export interface SessionChat {
   stream(conversationId: string, opts: ChatSendOpts): AsyncIterable<ChatStreamEvent>
   messages(conversationId: string, opts?: ChatMessageListOpts): Promise<{ data: ChatMessage[]; hasMore: boolean }>
   context(conversationId: string): Promise<ChatContextState>
-  injectContext(conversationId: string, opts: { content: string; role: 'system' }): Promise<void>
+  injectContext(conversationId: string, opts: { content: string; role: 'system'; pinned?: boolean; order?: number }): Promise<void>
   createThread(conversationId: string, opts: ChatThreadCreateOpts): Promise<ChatThread>
   threads(conversationId: string): Promise<ChatThread[]>
   handoff(conversationId: string, opts: ChatHandoffOpts): Promise<ChatHandoff>
@@ -420,7 +420,7 @@ export class Session {
     context: async (conversationId: string): Promise<ChatContextState> => {
       return this.http.get<ChatContextState>(`/v1/chat/${conversationId}/context`)
     },
-    injectContext: async (conversationId: string, opts: { content: string; role: 'system' }): Promise<void> => {
+    injectContext: async (conversationId: string, opts: { content: string; role: 'system'; pinned?: boolean; order?: number }): Promise<void> => {
       await this.http.post(`/v1/chat/${conversationId}/context`, opts)
     },
     createThread: async (conversationId: string, opts: ChatThreadCreateOpts): Promise<ChatThread> => {

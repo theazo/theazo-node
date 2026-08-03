@@ -76,6 +76,18 @@ import type {
   BillingBudgetConfig,
   BillingBudgetStatus,
   BillingCheckoutOpts,
+  Instruction,
+  Prompt,
+  Skill,
+  Hook,
+  InstructionCreate,
+  PromptCreate,
+  SkillCreate,
+  HookCreate,
+  PromptRenderResult,
+  Attachment,
+  AttachOpts,
+  Customization,
 } from './types.js'
 
 const DEFAULT_BASE_URL = 'https://api.theazo.com'
@@ -136,6 +148,22 @@ class AgentsNamespace {
 
   async versions(id: string): Promise<AgentDefinitionVersion[]> {
     return this.http.get<AgentDefinitionVersion[]>(`/v1/agent-definitions/${id}/versions`)
+  }
+
+  // ─── Customization attachments (§3.17) ──────────────────────────
+  async attach(definitionId: string, opts: AttachOpts): Promise<Attachment> {
+    return this.http.post<Attachment>(`/v1/agent-definitions/${definitionId}/attach`, opts)
+  }
+
+  async detach(definitionId: string, customizationId: string): Promise<void> {
+    await this.http.post(`/v1/agent-definitions/${definitionId}/detach`, { customizationId })
+  }
+
+  async attachments(definitionId: string): Promise<Array<Attachment & { customization: Customization | null }>> {
+    const r = await this.http.get<{ data: Array<Attachment & { customization: Customization | null }> }>(
+      `/v1/agent-definitions/${definitionId}/attachments`,
+    )
+    return r.data ?? []
   }
 
   async get(id: string): Promise<Agent> {
@@ -209,7 +237,7 @@ class WorkflowsNamespace {
   }
 
   /** Resume a run paused on a `wait` step by delivering the awaited event. */
-  async resumeRun(runId: string, opts: { event: string; payload?: Record<string, unknown> }): Promise<void> {
+  async resumeRun(runId: string, opts: import('./types.js').WorkflowResumeOpts): Promise<void> {
     await this.http.post(`/v1/workflow-runs/${runId}/resume`, opts)
   }
 
@@ -335,6 +363,95 @@ class ToolsNamespace {
 
   async delete(name: string): Promise<void> {
     await this.http.delete(`/v1/tools/${encodeURIComponent(name)}`)
+  }
+}
+
+// ─── Agent Customizations (§3.17) — one CRUD surface, four namespaces ─
+// All hit /v1/customizations; each pins its `kind` so the SDK surface stays
+// distinct (platform.instructions, platform.skills, …) per the design.
+
+class InstructionsNamespace {
+  constructor(private http: HttpClient) {}
+  async create(opts: InstructionCreate): Promise<Instruction> {
+    return this.http.post<Instruction>('/v1/customizations', { kind: 'instruction', ...opts })
+  }
+  async list(): Promise<Instruction[]> {
+    const r = await this.http.get<{ data: Instruction[] } | Instruction[]>('/v1/customizations', { kind: 'instruction' })
+    return Array.isArray(r) ? r : (r.data ?? [])
+  }
+  async get(id: string): Promise<Instruction> {
+    return this.http.get<Instruction>(`/v1/customizations/${id}`)
+  }
+  async update(id: string, opts: Partial<InstructionCreate>): Promise<Instruction> {
+    return this.http.put<Instruction>(`/v1/customizations/${id}`, opts)
+  }
+  async delete(id: string): Promise<void> {
+    await this.http.delete(`/v1/customizations/${id}`)
+  }
+}
+
+class PromptsNamespace {
+  constructor(private http: HttpClient) {}
+  async create(opts: PromptCreate): Promise<Prompt> {
+    return this.http.post<Prompt>('/v1/customizations', { kind: 'prompt', ...opts })
+  }
+  async list(): Promise<Prompt[]> {
+    const r = await this.http.get<{ data: Prompt[] } | Prompt[]>('/v1/customizations', { kind: 'prompt' })
+    return Array.isArray(r) ? r : (r.data ?? [])
+  }
+  async get(id: string): Promise<Prompt> {
+    return this.http.get<Prompt>(`/v1/customizations/${id}`)
+  }
+  async update(id: string, opts: Partial<PromptCreate>): Promise<Prompt> {
+    return this.http.put<Prompt>(`/v1/customizations/${id}`, opts)
+  }
+  async delete(id: string): Promise<void> {
+    await this.http.delete(`/v1/customizations/${id}`)
+  }
+  /** Render the template with values; missing required vars throw. */
+  async render(id: string, variables: Record<string, string>): Promise<string> {
+    const r = await this.http.post<PromptRenderResult>(`/v1/customizations/${id}/render`, { variables })
+    return r.text
+  }
+}
+
+class SkillsNamespace {
+  constructor(private http: HttpClient) {}
+  async create(opts: SkillCreate): Promise<Skill> {
+    return this.http.post<Skill>('/v1/customizations', { kind: 'skill', ...opts })
+  }
+  async list(): Promise<Skill[]> {
+    const r = await this.http.get<{ data: Skill[] } | Skill[]>('/v1/customizations', { kind: 'skill' })
+    return Array.isArray(r) ? r : (r.data ?? [])
+  }
+  async get(id: string): Promise<Skill> {
+    return this.http.get<Skill>(`/v1/customizations/${id}`)
+  }
+  async update(id: string, opts: Partial<SkillCreate>): Promise<Skill> {
+    return this.http.put<Skill>(`/v1/customizations/${id}`, opts)
+  }
+  async delete(id: string): Promise<void> {
+    await this.http.delete(`/v1/customizations/${id}`)
+  }
+}
+
+class HooksNamespace {
+  constructor(private http: HttpClient) {}
+  async create(opts: HookCreate): Promise<Hook> {
+    return this.http.post<Hook>('/v1/customizations', { kind: 'hook', ...opts })
+  }
+  async list(): Promise<Hook[]> {
+    const r = await this.http.get<{ data: Hook[] } | Hook[]>('/v1/customizations', { kind: 'hook' })
+    return Array.isArray(r) ? r : (r.data ?? [])
+  }
+  async get(id: string): Promise<Hook> {
+    return this.http.get<Hook>(`/v1/customizations/${id}`)
+  }
+  async update(id: string, opts: Partial<HookCreate>): Promise<Hook> {
+    return this.http.put<Hook>(`/v1/customizations/${id}`, opts)
+  }
+  async delete(id: string): Promise<void> {
+    await this.http.delete(`/v1/customizations/${id}`)
   }
 }
 
@@ -682,6 +799,10 @@ export class Theazo {
   readonly mcp: MCPNamespace
   readonly channels: ChannelsNamespace
   readonly files: FilesNamespace
+  readonly instructions: InstructionsNamespace
+  readonly prompts: PromptsNamespace
+  readonly skills: SkillsNamespace
+  readonly hooks: HooksNamespace
 
   constructor(config: TheazoConfig) {
     if (!config.apiKey) {
@@ -711,6 +832,10 @@ export class Theazo {
     this.mcp = new MCPNamespace(this.http)
     this.channels = new ChannelsNamespace(this.http)
     this.files = new FilesNamespace(this.http)
+    this.instructions = new InstructionsNamespace(this.http)
+    this.prompts = new PromptsNamespace(this.http)
+    this.skills = new SkillsNamespace(this.http)
+    this.hooks = new HooksNamespace(this.http)
   }
 }
 
