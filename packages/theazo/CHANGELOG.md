@@ -1,5 +1,22 @@
 # theazo
 
+## 0.1.9
+
+### Patch Changes
+
+- c844d2d: Add the `theazo.secrets` and `theazo.models` namespaces, and extend BYOI compute config:
+
+  - **`theazo.secrets`** — org-wide secrets (platform-level, shared across sessions): `set(kv)`, `list()`, `delete(name)`. (Session-scoped secrets remain on `session.secrets`.)
+  - **`theazo.models`** — the model catalog: `list()`, `get(id)`, `estimate({ model, inputTokens, outputTokens })`, with `Model` / `ModelEstimate` types.
+  - **BYOI compute config** — `TheazoConfig.compute` and `ComputeProviderConfig` now accept `credentialRef` (a secret ref) and `endpoint` (for webhook/custom compute), matching the model config and the provider-config API.
+
+- 46570b9: Reconcile SDK types with the `@theazo/contracts` single source and add the customizations surface:
+
+  - **Agents:** `AgentCreateOpts.model` is now `string` (dropped the never-accepted `AgentModelConfig` object form); added `mcp?: string[] | '*'`; `overrides` is now `Record<string, unknown>`.
+  - **Workflows:** `WorkflowCreateOpts` gains `concurrency?` and `plannerPolicy?`, and `name` is now optional (the API defaults it); added the `WorkflowResumeOpts` type used by `workflows.resumeRun()`.
+  - **Agent definitions:** the create/update field `instructions` is renamed to `systemPrompt` to match the platform data model. **Breaking for callers using `instructions`** — rename to `systemPrompt`.
+  - **Customizations (§3.17):** new `platform.instructions` / `platform.prompts` / `platform.skills` / `platform.hooks` namespaces plus `agents.attach` / `detach` / `attachments`, and their types.
+
 ## 0.1.8
 
 ### Patch Changes
