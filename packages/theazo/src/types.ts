@@ -1278,7 +1278,11 @@ export interface ApiKeyCreated extends ApiKey {
 
 export interface ComputeProviderConfig {
   provider: string
-  credentials: Record<string, string>
+  credentials?: Record<string, string>
+  /** Name of a secret (in the vault) holding the provider key — the credentialRef pattern. */
+  credentialRef?: string
+  /** For webhook/custom compute: the HTTP endpoint Theazo calls. */
+  endpoint?: string
   priority?: number
   limits?: { maxConcurrent?: number }
 }
@@ -1288,6 +1292,35 @@ export interface ModelProviderConfig {
   credentials?: Record<string, string>
   baseUrl?: string
   credentialRef?: string
+}
+
+// ─── Model catalog (theazo.models.*) ────────────────────────────────
+
+export interface Model {
+  id: string          // 'anthropic/claude-sonnet'
+  name: string        // 'Claude Sonnet'
+  provider: string    // 'anthropic' | 'openai' | …
+  inputCostPer1M: number   // cents per 1M input tokens
+  outputCostPer1M: number  // cents per 1M output tokens
+  maxTokens: number
+  capabilities: string[]   // 'text' | 'vision' | 'tool_use' | …
+}
+
+export interface ModelEstimateOpts {
+  model: string
+  inputTokens: number
+  outputTokens: number
+}
+
+export interface ModelEstimate {
+  model: string
+  inputTokens: number
+  outputTokens: number
+  estimatedCost: {
+    modelCost: Cost
+    theazoMargin: Cost
+    total: Cost
+  }
 }
 
 /** Per-agent model override. Allows mixing managed + BYOI models in the same session. */
@@ -1306,7 +1339,7 @@ export interface TheazoConfig {
   apiKey: string
   baseUrl?: string
   compute?:
-    | { provider: string; credentials: Record<string, string> }
+    | { provider: string; credentials?: Record<string, string>; credentialRef?: string; endpoint?: string }
     | { providers: ComputeProviderConfig[] }
   models?: ModelProviderConfig
 }

@@ -58,6 +58,10 @@ import type {
   FileUploadOpts,
   MCPConnectOpts,
   MCPConnection,
+  SecretInfo,
+  Model,
+  ModelEstimateOpts,
+  ModelEstimate,
   MCPTool,
   MCPHealth,
   MCPUpdateOpts,
@@ -776,6 +780,49 @@ class BillingNamespace {
   }
 }
 
+// Org-wide secrets — available to every session under the platform. (Session-scoped
+// secrets live on `session.secrets`.) Values are encrypted at rest and never returned.
+class SecretsNamespace {
+  constructor(private http: HttpClient) {}
+
+  /** Set one or more org-wide secrets (a name → value map). Existing names are overwritten. */
+  async set(secrets: Record<string, string>): Promise<void> {
+    await this.http.post('/v1/secrets', secrets)
+  }
+
+  /** List org-wide secret names + metadata (values are never returned). */
+  async list(): Promise<SecretInfo[]> {
+    const res = await this.http.get<{ data: SecretInfo[] } | SecretInfo[]>('/v1/secrets')
+    return Array.isArray(res) ? res : res.data
+  }
+
+  /** Delete an org-wide secret by name. */
+  async delete(name: string): Promise<void> {
+    await this.http.delete<{ ok: boolean }>(`/v1/secrets/${encodeURIComponent(name)}`)
+  }
+}
+
+// The model catalog — available models, their pricing/capabilities, and cost estimation.
+class ModelsNamespace {
+  constructor(private http: HttpClient) {}
+
+  /** List available models with pricing and capabilities. */
+  async list(): Promise<Model[]> {
+    const res = await this.http.get<{ data: Model[] } | Model[]>('/v1/models')
+    return Array.isArray(res) ? res : res.data
+  }
+
+  /** Get one model by ID, e.g. 'anthropic/claude-sonnet'. */
+  async get(id: string): Promise<Model> {
+    return this.http.get<Model>(`/v1/models/${id}`)
+  }
+
+  /** Estimate the cost of a model call for a given token count. */
+  async estimate(opts: ModelEstimateOpts): Promise<ModelEstimate> {
+    return this.http.post<ModelEstimate>('/v1/models/estimate', opts)
+  }
+}
+
 // ─── Main Theazo Class ──────────────────────────────────────────────
 
 export class Theazo {
@@ -794,6 +841,8 @@ export class Theazo {
   readonly traces: TracesNamespace
   readonly usage: UsageNamespace
   readonly billing: BillingNamespace
+  readonly secrets: SecretsNamespace
+  readonly models: ModelsNamespace
   readonly guardrails: GuardrailsNamespace
   readonly webhooks: WebhooksNamespace
   readonly mcp: MCPNamespace
@@ -827,6 +876,8 @@ export class Theazo {
     this.traces = new TracesNamespace(this.http)
     this.usage = new UsageNamespace(this.http)
     this.billing = new BillingNamespace(this.http)
+    this.secrets = new SecretsNamespace(this.http)
+    this.models = new ModelsNamespace(this.http)
     this.guardrails = new GuardrailsNamespace(this.http)
     this.webhooks = new WebhooksNamespace(this.http)
     this.mcp = new MCPNamespace(this.http)
